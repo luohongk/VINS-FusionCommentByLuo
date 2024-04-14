@@ -52,33 +52,38 @@ FeatureTracker::FeatureTracker()
     hasPrediction = false;
 }
 
+// 设置掩模
 void FeatureTracker::setMask()
 {
-    mask = cv::Mat(row, col, CV_8UC1, cv::Scalar(255));
+    mask = cv::Mat(row, col, CV_8UC1, cv::Scalar(255)); // 用白色初始化掩模矩阵
 
-    // prefer to keep features that are tracked for long time
+    // 更喜欢保留长时间跟踪的特征点
     vector<pair<int, pair<cv::Point2f, int>>> cnt_pts_id;
 
+    // 将当前特征点、其对应的跟踪次数和ID按跟踪次数降序排列存储
     for (unsigned int i = 0; i < cur_pts.size(); i++)
         cnt_pts_id.push_back(make_pair(track_cnt[i], make_pair(cur_pts[i], ids[i])));
 
+    // 根据跟踪次数降序排列
     sort(cnt_pts_id.begin(), cnt_pts_id.end(), [](const pair<int, pair<cv::Point2f, int>> &a, const pair<int, pair<cv::Point2f, int>> &b)
          {
             return a.first > b.first;
          });
 
+    // 清空当前特征点、ID和跟踪次数
     cur_pts.clear();
     ids.clear();
     track_cnt.clear();
 
+    // 根据掩模筛选特征点并更新掩模
     for (auto &it : cnt_pts_id)
     {
-        if (mask.at<uchar>(it.second.first) == 255)
+        if (mask.at<uchar>(it.second.first) == 255) // 如果特征点在掩模内
         {
-            cur_pts.push_back(it.second.first);
-            ids.push_back(it.second.second);
-            track_cnt.push_back(it.first);
-            cv::circle(mask, it.second.first, MIN_DIST, 0, -1);
+            cur_pts.push_back(it.second.first); // 更新当前特征点
+            ids.push_back(it.second.second); // 更新ID
+            track_cnt.push_back(it.first); // 更新跟踪次数
+            cv::circle(mask, it.second.first, MIN_DIST, 0, -1); // 根据特征点更新掩模
         }
     }
 }
@@ -106,7 +111,9 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     row = cur_img.rows;
     // 获取当前图像的列数
     col = cur_img.cols;
-    cv::Mat rightImg = _img1; // 设置辅助图像
+
+    // 设置右目图像
+    cv::Mat rightImg = _img1;
 
     /*
     {
@@ -131,6 +138,8 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             // 使用光流法跟踪先前特征点到当前帧
             cur_pts = predict_pts;
             cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 1, 
+
+            // 定义了迭代终止的条件，即迭代次数达到30或误差小于0.01时停止迭代。
             cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
             
             // 统计成功跟踪的特征点数量
@@ -143,6 +152,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
 
             // 如果成功跟踪的特征点数量小于10，重新进行光流法跟踪
             if (succ_num < 10)
+               // 不使用初始光流估计（不传入cv::OPTFLOW_USE_INITIAL_FLOW参数
                cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 3);
         }
         else
@@ -151,10 +161,16 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         // 是否进行反向光流法
         if(FLOW_BACK)
         {
+            // 创建一个存储反向光流跟踪状态的向量reverse_status
             vector<uchar> reverse_status;
+
+            //反向光流跟踪的结果存储在reverse_pts中
             vector<cv::Point2f> reverse_pts = prev_pts;
             cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 1, 
             cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
+            
+            // 对于每个特征点，如果对应的正向光流跟踪状态status[i]为1，反向光流跟踪状态reverse_status[i]也为1，
+            // 并且先前特征点与反向跟踪得到的特征点之间的距离小于等于0.5，那么将该特征点的状态更新为1
             for(size_t i = 0; i < status.size(); i++)
             {
                 if(status[i] && reverse_status[i] && distance(prev_pts[i], reverse_pts[i]) <= 0.5)
@@ -167,9 +183,13 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         }
         
         // 移除跟丢的特征点
+        // 如果特征点的状态status[i]为1（即成功跟踪），
+        // 并且特征点不在边界内（通过inBorder函数判断），则将该特征点的状态设置为0，表示跟踪失败。
         for (int i = 0; i < int(cur_pts.size()); i++)
             if (status[i] && !inBorder(cur_pts[i]))
                 status[i] = 0;
+
+        // 删除跟踪失败的点，也就是status是0的点
         reduceVector(prev_pts, status);
         reduceVector(cur_pts, status);
         reduceVector(ids, status);
@@ -191,6 +211,9 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
 
         ROS_DEBUG("detect feature begins"); // 输出检测特征点开始信息
         TicToc t_t; // 计时开始
+
+        // 这行代码主要是看看还需要补多少个点
+        // 这里的MAX_CNT是最大特征点数，n_max_cnt是还需要补充的特征点数
         int n_max_cnt = MAX_CNT - static_cast<int>(cur_pts.size());
         if (n_max_cnt > 0)
         {
@@ -214,25 +237,32 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         //printf("feature cnt after add %d\n", (int)ids.size());
     }
 
+    // 对特征跟踪进行注释
+    
+    // 对应的未畸变的点
     cur_un_pts = undistortedPts(cur_pts, m_camera[0]);
+    
+    // 计算点的速度
     pts_velocity = ptsVelocity(ids, cur_un_pts, cur_un_pts_map, prev_un_pts_map);
-
+    
+    // 如果图像不为空且为立体摄像头
     if(!_img1.empty() && stereo_cam)
     {
+        // 清空右侧图像的ID和点
         ids_right.clear();
         cur_right_pts.clear();
         cur_un_right_pts.clear();
         right_pts_velocity.clear();
         cur_un_right_pts_map.clear();
+    
+        // 如果当前点不为空
         if(!cur_pts.empty())
         {
-            //printf("stereo image; track feature on right image\n");
+            // 计算光流并进行反向检查
             vector<cv::Point2f> reverseLeftPts;
             vector<uchar> status, statusRightLeft;
             vector<float> err;
-            // cur left ---- cur right
             cv::calcOpticalFlowPyrLK(cur_img, rightImg, cur_pts, cur_right_pts, status, err, cv::Size(21, 21), 3);
-            // reverse check cur right ---- cur left
             if(FLOW_BACK)
             {
                 cv::calcOpticalFlowPyrLK(rightImg, cur_img, cur_right_pts, reverseLeftPts, statusRightLeft, err, cv::Size(21, 21), 3);
@@ -244,42 +274,46 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
                         status[i] = 0;
                 }
             }
-
+    
+            // 复制ID并根据状态缩减左图像和右图像的点
             ids_right = ids;
             reduceVector(cur_right_pts, status);
             reduceVector(ids_right, status);
-            // only keep left-right pts
-            /*
-            reduceVector(cur_pts, status);
-            reduceVector(ids, status);
-            reduceVector(track_cnt, status);
-            reduceVector(cur_un_pts, status);
-            reduceVector(pts_velocity, status);
-            */
+    
+            // 对右侧点进行畸变矫正并计算点速度
             cur_un_right_pts = undistortedPts(cur_right_pts, m_camera[1]);
             right_pts_velocity = ptsVelocity(ids_right, cur_un_right_pts, cur_un_right_pts_map, prev_un_right_pts_map);
         }
         prev_un_right_pts_map = cur_un_right_pts_map;
     }
+    // 如果SHOW_TRACK为真，则调用drawTrack函数，传入当前图像cur_img、右侧图像rightImg、特征点ids、当前特征点cur_pts、右侧当前特征点cur_right_pts、以及前一帧左侧特征点prevLeftPtsMap
     if(SHOW_TRACK)
         drawTrack(cur_img, rightImg, ids, cur_pts, cur_right_pts, prevLeftPtsMap);
-
+    
+    // 将当前帧信息赋值给上一帧的变量
     prev_img = cur_img;
     prev_pts = cur_pts;
     prev_un_pts = cur_un_pts;
     prev_un_pts_map = cur_un_pts_map;
     prev_time = cur_time;
     hasPrediction = false;
-
+    
+    // 清空prevLeftPtsMap
     prevLeftPtsMap.clear();
+    
+    // 将当前特征点cur_pts按照其ids映射到prevLeftPtsMap中
     for(size_t i = 0; i < cur_pts.size(); i++)
         prevLeftPtsMap[ids[i]] = cur_pts[i];
-
+    
+    // 创建一个存储特征帧信息的featureFrame映射
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
+    
+    // 遍历当前特征点ids
     for (size_t i = 0; i < ids.size(); i++)
     {
+        // 提取特征点信息
         int feature_id = ids[i];
-        double x, y ,z;
+        double x, y, z;
         x = cur_un_pts[i].x;
         y = cur_un_pts[i].y;
         z = 1;
@@ -290,9 +324,12 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         double velocity_x, velocity_y;
         velocity_x = pts_velocity[i].x;
         velocity_y = pts_velocity[i].y;
-
+    
+        // 创建存储特征点xyz坐标、像素坐标、速度的Eigen向量xyz_uv_velocity
         Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
         xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
+    
+        // 将特征点信息按照feature_id存入featureFrame中
         featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
     }
 
