@@ -166,6 +166,8 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
 
     // 保存特征帧的字典 featureFrame 和特征追踪计时器
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
+
+    //TicToc为一个计时器类，用于统计程序运行时间
     TicToc featureTrackerTime;
 
     // 如果 _img1 为空，则调用 featureTracker 的 trackImage 方法对单张图像 _img 进行特征追踪
