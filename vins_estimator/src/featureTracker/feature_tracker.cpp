@@ -198,6 +198,8 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     }
 
     // 更新特征点的跟踪帧数
+    // 这段代码会遍历 track_cnt 容器中的每个元素，并将每个元素的值递增1。
+    // 这里修改的是容器中的元素值，而不是容器自身。
     for (auto &n : track_cnt)
         n++;
 
@@ -221,6 +223,12 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
                 cout << "mask is empty " << endl;
             if (mask.type() != CV_8UC1)
                 cout << "mask type wrong " << endl;
+            // cv::goodFeaturesToTrack 使用了 Harris 角点检测算法或 Shi-Tomasi 角点检测算法来检测图像中的特征点。
+            // n_pts：要提取的特征点的最大数量。
+            // mark 这里的n_pts是在哪里维护的？？？
+            // done 这里的n_pts是用来存储检测到的特征点的数量的。就在这里维护的！
+
+            // mark 这里的n_pts为什么是值传递？？？
             cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);
         }
         else
@@ -236,19 +244,18 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         }
         //printf("feature cnt after add %d\n", (int)ids.size());
     }
-
-    // 对特征跟踪进行注释
     
-    // 对应的未畸变的点
+    // 对特征点进行去畸变处理
     cur_un_pts = undistortedPts(cur_pts, m_camera[0]);
     
     // 计算点的速度
+    // 根据当前帧的特征点与上一帧的特征点进行速度计算
     pts_velocity = ptsVelocity(ids, cur_un_pts, cur_un_pts_map, prev_un_pts_map);
     
-    // 如果图像不为空且为立体摄像头
+    // 如果右目图像不为空且为立体摄像头
     if(!_img1.empty() && stereo_cam)
     {
-        // 清空右侧图像的ID和点
+        // 清空右目图像的ID和点
         ids_right.clear();
         cur_right_pts.clear();
         cur_un_right_pts.clear();
@@ -256,6 +263,9 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         cur_un_right_pts_map.clear();
     
         // 如果当前点不为空
+        // mark 这里为什么要做一个判断？？？
+        // done 这里是根据左目的特征点去光流追踪右目的特征点。
+
         if(!cur_pts.empty())
         {
             // 计算光流并进行反向检查
@@ -276,6 +286,8 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             }
     
             // 复制ID并根据状态缩减左图像和右图像的点
+            // mark 这里的这个ids不是左目的吗？ 为什么把左目的ids赋值给右目？？？
+            // done 由于是根据左目特征点光流追踪右目的特征点，因此左目右目ID是相同的。都对应的是同一个地图点
             ids_right = ids;
             reduceVector(cur_right_pts, status);
             reduceVector(ids_right, status);
@@ -288,9 +300,11 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     }
     // 如果SHOW_TRACK为真，则调用drawTrack函数，传入当前图像cur_img、右侧图像rightImg、特征点ids、当前特征点cur_pts、右侧当前特征点cur_right_pts、以及前一帧左侧特征点prevLeftPtsMap
     if(SHOW_TRACK)
+        // 这个函数主要用于画图
         drawTrack(cur_img, rightImg, ids, cur_pts, cur_right_pts, prevLeftPtsMap);
     
     // 将当前帧信息赋值给上一帧的变量
+    //更新上一帧的信息，当前帧变成老的一帧了
     prev_img = cur_img;
     prev_pts = cur_pts;
     prev_un_pts = cur_un_pts;
@@ -301,11 +315,14 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     // 清空prevLeftPtsMap
     prevLeftPtsMap.clear();
     
-    // 将当前特征点cur_pts按照其ids映射到prevLeftPtsMap中
+    // 将当前左目特征点cur_pts按照其ids映射到prevLeftPtsMap中
     for(size_t i = 0; i < cur_pts.size(); i++)
         prevLeftPtsMap[ids[i]] = cur_pts[i];
     
     // 创建一个存储特征帧信息的featureFrame映射
+    // 第一个int表示特征点的id信息，pair里面的int表示是单目还是双目里面的特征点信息，单目的话就是0，双目的话就是1
+    // Eigen::Matrix<double, 7, 1>表示针对每一个特征点的7个信息
+    // 这个7纬度的向量比表示归一化平面的坐标（x,y,z,z=1）,像素坐标(u,v),速度(vx,vy)。
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
     
     // 遍历当前特征点ids
@@ -326,10 +343,12 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         velocity_y = pts_velocity[i].y;
     
         // 创建存储特征点xyz坐标、像素坐标、速度的Eigen向量xyz_uv_velocity
+        // 这个7纬度的向量比表示归一化平面的坐标（x,y,z,z=1）,像素坐标(u,v),速度(vx,vy)。
         Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
         xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
     
         // 将特征点信息按照feature_id存入featureFrame中
+        // 把左目的帧放入进去
         featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
     }
 
