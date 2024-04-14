@@ -91,14 +91,23 @@ double FeatureTracker::distance(cv::Point2f &pt1, cv::Point2f &pt2)
     return sqrt(dx * dx + dy * dy);
 }
 
+// 在 FeatureTracker 类中的 trackImage 方法中添加注释
+// 输入参数为当前时间 _cur_time、图像 _img 和辅助图像 _img1
+// 返回类型为 map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>>
 map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackImage(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1)
 {
-    TicToc t_r;
+    TicToc t_r; // 计时开始
+
+    // 设置当前时间
     cur_time = _cur_time;
+    // 设置当前图像
     cur_img = _img;
+    // 获取当前图像的行数
     row = cur_img.rows;
+    // 获取当前图像的列数
     col = cur_img.cols;
-    cv::Mat rightImg = _img1;
+    cv::Mat rightImg = _img1; // 设置辅助图像
+
     /*
     {
         cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
@@ -107,38 +116,45 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             clahe->apply(rightImg, rightImg);
     }
     */
-    cur_pts.clear();
+    cur_pts.clear(); // 清空当前特征点
 
+    // 如果存在先前特征点
     if (prev_pts.size() > 0)
     {
-        TicToc t_o;
+        TicToc t_o; // 计时开始
         vector<uchar> status;
         vector<float> err;
+
+        // 如果具有预测的特征点
         if(hasPrediction)
         {
+            // 使用光流法跟踪先前特征点到当前帧
             cur_pts = predict_pts;
             cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 1, 
             cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
             
+            // 统计成功跟踪的特征点数量
             int succ_num = 0;
             for (size_t i = 0; i < status.size(); i++)
             {
                 if (status[i])
                     succ_num++;
             }
+
+            // 如果成功跟踪的特征点数量小于10，重新进行光流法跟踪
             if (succ_num < 10)
                cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 3);
         }
         else
             cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 3);
-        // reverse check
+        
+        // 是否进行反向光流法
         if(FLOW_BACK)
         {
             vector<uchar> reverse_status;
             vector<cv::Point2f> reverse_pts = prev_pts;
             cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 1, 
             cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
-            //cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 3); 
             for(size_t i = 0; i < status.size(); i++)
             {
                 if(status[i] && reverse_status[i] && distance(prev_pts[i], reverse_pts[i]) <= 0.5)
@@ -150,6 +166,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             }
         }
         
+        // 移除跟丢的特征点
         for (int i = 0; i < int(cur_pts.size()); i++)
             if (status[i] && !inBorder(cur_pts[i]))
                 status[i] = 0;
@@ -157,23 +174,23 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         reduceVector(cur_pts, status);
         reduceVector(ids, status);
         reduceVector(track_cnt, status);
-        ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
-        //printf("track cnt %d\n", (int)ids.size());
+        ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc()); // 输出光流跟踪耗时
     }
 
+    // 更新特征点的跟踪帧数
     for (auto &n : track_cnt)
         n++;
 
     if (1)
     {
         //rejectWithF();
-        ROS_DEBUG("set mask begins");
-        TicToc t_m;
-        setMask();
-        ROS_DEBUG("set mask costs %fms", t_m.toc());
+        ROS_DEBUG("set mask begins"); // 输出设置掩模开始信息
+        TicToc t_m; // 计时开始
+        setMask(); // 设置掩模
+        ROS_DEBUG("set mask costs %fms", t_m.toc()); // 输出设置掩模耗时信息
 
-        ROS_DEBUG("detect feature begins");
-        TicToc t_t;
+        ROS_DEBUG("detect feature begins"); // 输出检测特征点开始信息
+        TicToc t_t; // 计时开始
         int n_max_cnt = MAX_CNT - static_cast<int>(cur_pts.size());
         if (n_max_cnt > 0)
         {
@@ -185,8 +202,9 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         }
         else
             n_pts.clear();
-        ROS_DEBUG("detect feature costs: %f ms", t_t.toc());
+        ROS_DEBUG("detect feature costs: %f ms", t_t.toc()); // 输出检测特征点耗时信息
 
+        // 将新检测到的特征点加入当前特征点列表
         for (auto &p : n_pts)
         {
             cur_pts.push_back(p);

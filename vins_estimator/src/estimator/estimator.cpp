@@ -92,31 +92,33 @@ void Estimator::clearState()
     mProcess.unlock();
 }
 
+// 设置Estimator类的参数
 void Estimator::setParameter()
 {
-    mProcess.lock();
+    mProcess.lock();  // 上锁以确保多线程安全访问
     for (int i = 0; i < NUM_OF_CAM; i++)
     {
-        tic[i] = TIC[i];
-        ric[i] = RIC[i];
-        cout << " exitrinsic cam " << i << endl  << ric[i] << endl << tic[i].transpose() << endl;
+        tic[i] = TIC[i];  // 设置相机i的平移向量
+        ric[i] = RIC[i];  // 设置相机i的旋转矩阵
+        cout << " exitrinsic cam " << i << endl  << ric[i] << endl << tic[i].transpose() << endl;  // 输出相机i的外参信息
     }
-    f_manager.setRic(ric);
+    f_manager.setRic(ric);  // 设置特征管理器的ric参数
+    // 设置三种因子函数的信息矩阵
     ProjectionTwoFrameOneCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
     ProjectionTwoFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
     ProjectionOneFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
-    td = TD;
-    g = G;
-    cout << "set g " << g.transpose() << endl;
-    featureTracker.readIntrinsicParameter(CAM_NAMES);
+    td = TD;  // 设置时间偏置参数
+    g = G;    // 设置重力加速度向量
+    cout << "set g " << g.transpose() << endl;  // 输出设置后的重力加速度向量
+    featureTracker.readIntrinsicParameter(CAM_NAMES);  // 读取相机的内参参数
 
-    std::cout << "MULTIPLE_THREAD is " << MULTIPLE_THREAD << '\n';
-    if (MULTIPLE_THREAD && !initThreadFlag)
+    std::cout << "MULTIPLE_THREAD is " << MULTIPLE_THREAD << '\n';  // 输出是否启用多线程的信息
+    if (MULTIPLE_THREAD && !initThreadFlag)  // 如果启用了多线程且未初始化线程标志为假
     {
-        initThreadFlag = true;
-        processThread = std::thread(&Estimator::processMeasurements, this);
+        initThreadFlag = true;  // 设置初始化线程标志为真
+        processThread = std::thread(&Estimator::processMeasurements, this);  // 初始化处理测量数据的线程
     }
-    mProcess.unlock();
+    mProcess.unlock();  // 解锁以释放多线程安全访问
 }
 
 void Estimator::changeSensorType(int use_imu, int use_stereo)
@@ -157,43 +159,50 @@ void Estimator::changeSensorType(int use_imu, int use_stereo)
     }
 }
 
+// Estimator 类的 inputImage 方法
 void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
 {
-    inputImageCnt++;
+    inputImageCnt++;  // 增加图片输入次数计数
+
+    // 保存特征帧的字典 featureFrame 和特征追踪计时器
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
     TicToc featureTrackerTime;
 
+    // 如果 _img1 为空，则调用 featureTracker 的 trackImage 方法对单张图像 _img 进行特征追踪
+    // 否则调用 trackImage 方法对图像 _img 和 _img1 进行特征追踪
     if(_img1.empty())
         featureFrame = featureTracker.trackImage(t, _img);
     else
         featureFrame = featureTracker.trackImage(t, _img, _img1);
-    //printf("featureTracker time: %f\n", featureTrackerTime.toc());
 
+    // 如果 SHOW_TRACK 为真，则获取特征追踪图像并发布
     if (SHOW_TRACK)
     {
         cv::Mat imgTrack = featureTracker.getTrackImage();
-        pubTrackImage(imgTrack, t);
+        pubTrackImage(imgTrack, t);  // 发布特征追踪图像
     }
     
+    // 如果 MULTIPLE_THREAD 为真，并且输入次数为偶数，则将特征帧数据存入 featureBuf 中
+    // 否则直接将特征帧数据存入 featureBuf，并调用 processMeasurements 方法对测量数据进行处理并打印处理时间
     if(MULTIPLE_THREAD)  
     {     
         if(inputImageCnt % 2 == 0)
         {
-            mBuf.lock();
-            featureBuf.push(make_pair(t, featureFrame));
-            mBuf.unlock();
+            mBuf.lock();  // 加锁
+            featureBuf.push(make_pair(t, featureFrame));  // 存入特征帧数据
+            mBuf.unlock();  // 解锁
         }
     }
     else
     {
-        mBuf.lock();
-        featureBuf.push(make_pair(t, featureFrame));
-        mBuf.unlock();
+        mBuf.lock();  // 加锁
+        featureBuf.push(make_pair(t, featureFrame));  // 存入特征帧数据
+        mBuf.unlock();  // 解锁
+
         TicToc processTime;
-        processMeasurements();
-        printf("process time: %f\n", processTime.toc());
+        processMeasurements();  // 处理测量数据
+        printf("process time: %f\n", processTime.toc());  // 打印处理时间
     }
-    
 }
 
 void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vector3d &angularVelocity)

@@ -302,6 +302,8 @@ int main(int argc, char **argv)
     ros::Subscriber sub_imu;
     if(USE_IMU)
     {
+        // 使用n.subscribe()函数订阅名为IMU_TOPIC的主题，设置队列大小为2000，
+        // 并指定imu_callback作为接收到消息时的回调函数，同时使用ros::TransportHints().tcpNoDelay()设置传输选项。
         sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
     }
     // 创建特征数据订阅者

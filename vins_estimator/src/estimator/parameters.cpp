@@ -65,7 +65,10 @@ T readParam(ros::NodeHandle &n, std::string name)
 
 void readParameters(std::string config_file)
 {
+    // 打开配置文件
     FILE *fh = fopen(config_file.c_str(),"r");
+
+    // 判断配置文件是否存在
     if(fh == NULL){
         ROS_WARN("config_file dosen't exist; wrong config_file path");
         ROS_BREAK();
@@ -73,12 +76,16 @@ void readParameters(std::string config_file)
     }
     fclose(fh);
 
+    // 初始化fsSetting
     cv::FileStorage fsSettings(config_file, cv::FileStorage::READ);
+
+    // 判断fsSetting是否打开成功
     if(!fsSettings.isOpened())
     {
         std::cerr << "ERROR: Wrong path to settings" << std::endl;
     }
 
+    // 从配置文件中读取一些参数放到fsSetting
     fsSettings["image0_topic"] >> IMAGE0_TOPIC;
     fsSettings["image1_topic"] >> IMAGE1_TOPIC;
     MAX_CNT = fsSettings["max_cnt"];
@@ -91,6 +98,8 @@ void readParameters(std::string config_file)
 
     USE_IMU = fsSettings["imu"];
     printf("USE_IMU: %d\n", USE_IMU);
+
+    // 如果使用IMU，对IMU进行相关的设置
     if(USE_IMU)
     {
         fsSettings["imu_topic"] >> IMU_TOPIC;
@@ -195,6 +204,6 @@ void readParameters(std::string config_file)
         ESTIMATE_TD = 0;
         printf("no imu, fix extrinsic param; no time offset calibration\n");
     }
-
+    // 调用release()方法表示释放FileStorage对象所持有的资源，以便在不再需要该对象时释放内存和关闭文件句柄
     fsSettings.release();
 }
