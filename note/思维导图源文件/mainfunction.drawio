@@ -1,0 +1,139 @@
+<mxfile host="65bd71144e">
+    <diagram id="W_fYMVlUyPx3CGEZncxc" name="第 1 页">
+        <mxGraphModel dx="464" dy="481" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="初始化ROS节点" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="60" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="&lt;font face=&quot;Lucida Console&quot;&gt;main函数入口&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="20" width="100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="82.5" y="120" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="读取config文件夹中的参数，放入parameter类中" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="210" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="82.5" y="270" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="读取config文件夹中的参数，放入估计器对象estimator对象中" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="360" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="72.5" y="430" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="创建IMU数据订阅，特征数据订阅，图像数据订阅" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="520" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="&lt;div style=&quot;color: rgb(171, 178, 191); background-color: rgb(40, 44, 52); font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; font-size: 11.2px; line-height: 15px;&quot;&gt;&lt;span style=&quot;color: #61afef;font-weight: bold;&quot;&gt;sync_process线程同步处理&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: rgb(171, 178, 191); background-color: rgb(40, 44, 52); font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; font-size: 11.2px; line-height: 15px;&quot;&gt;&lt;span style=&quot;color: #61afef;font-weight: bold;&quot;&gt;只要缓冲区来图像了和imu数据了就会同步处理&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="165" y="15" width="260" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="是否是双目" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="245" y="80" width="100" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="277.5" y="130" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="是" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="305" y="130" width="40" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;rotation=-90;" vertex="1" parent="1">
+                    <mxGeometry x="379" y="60" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" value="否" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="55" width="40" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" value="进行两张图像的时间戳对其（保证正负0.003秒），对其后从图像缓冲区拿到图像并且弹出图像" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="235" y="220" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" value="直接获取缓冲区图像队列的头front指针指向的图像数据" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="440" y="70" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" value="" style="endArrow=none;html=1;fontFamily=Times New Roman;" edge="1" parent="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="500" y="360" as="sourcePoint"/>
+                        <mxPoint x="500" y="130" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="20" value="" style="endArrow=none;html=1;fontFamily=Times New Roman;entryX=0.459;entryY=1.007;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" target="17">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="290" y="360" as="sourcePoint"/>
+                        <mxPoint x="420" y="340" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="21" value="" style="endArrow=none;html=1;fontFamily=Times New Roman;" edge="1" parent="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="290" y="360" as="sourcePoint"/>
+                        <mxPoint x="500" y="360" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="22" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="362.5" y="360" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="23" value="将图像数据扔进estimator对象（执行inputimage函数）" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="320" y="450" width="120" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="24" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="362.5" y="510" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="25" value="初始化计时器与特征呢保存容器（map类型）" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="320" y="600" width="120" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="26" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="355" y="660" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="27" value="进行图像跟踪（trackimage）" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="312.5" y="750" width="120" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="28" value="" style="endArrow=classic;html=1;fontFamily=Times New Roman;" edge="1" parent="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="440" y="770" as="sourcePoint"/>
+                        <mxPoint x="640" y="140" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="29" value="根据是否有预测点进行两种不同方式的光流追踪" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="657.5" y="390" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="30" value="判断是否有预测点" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="651.25" y="230" width="132.5" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="31" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="700" y="140" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="32" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="700" y="300" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="33" value="进行反向光流追踪(这个是根据配置文件的参数进行设定的)" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;dashed=1;dashPattern=12 12;" vertex="1" parent="1">
+                    <mxGeometry x="657.5" y="550" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="34" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="700" y="460" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="36" value="这里的主要区别在于是否采用初始光流估计" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=12 12;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="810" y="390" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="37" value="进行图像的初始化，清除当前帧的特征点" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="657.5" y="70" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="38" value="去除跟丢的特征点以及在边界外的特征点" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="657.5" y="710" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="39" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="700" y="780" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="40" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="700" y="620" width="35" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="41" value="设置掩膜Mask" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="657.5" y="870" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="43" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;labelPosition=left;verticalLabelPosition=middle;align=right;verticalAlign=middle;dashed=1;dashPattern=12 12;fontFamily=Times New Roman;" vertex="1" parent="1">
+                    <mxGeometry x="810" y="770" width="60" height="250" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
