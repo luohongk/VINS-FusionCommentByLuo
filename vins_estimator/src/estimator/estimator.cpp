@@ -178,6 +178,7 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
         featureFrame = featureTracker.trackImage(t, _img, _img1);
 
     // 如果 SHOW_TRACK 为真，则获取特征追踪图像并发布
+    // 在可视化界面中展示图像
     if (SHOW_TRACK)
     {
         cv::Mat imgTrack = featureTracker.getTrackImage();
@@ -186,8 +187,12 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
     
     // 如果 MULTIPLE_THREAD 为真，并且输入次数为偶数，则将特征帧数据存入 featureBuf 中
     // 否则直接将特征帧数据存入 featureBuf，并调用 processMeasurements 方法对测量数据进行处理并打印处理时间
-    if(MULTIPLE_THREAD)  
-    {     
+    // MULTIPLE_THREAD是否启用多线程处理，这个是从config文件中读取的
+
+    // mark 此处不是太理解为什么要对输入的图片数做一个偶数判断
+    if(MULTIPLE_THREAD) 
+    {
+    //  会检查输入图片的次数，如果是偶数，则将特征帧数据存入 featureBuf 中。这个机制可能是为了优化多线程处理
         if(inputImageCnt % 2 == 0)
         {
             mBuf.lock();  // 加锁
@@ -278,11 +283,13 @@ bool Estimator::IMUAvailable(double t)
         return false;
 }
 
+// Estimator 类中的 processMeasurements 方法用于处理测量数据
 void Estimator::processMeasurements()
 {
     while (1)
     {
         //printf("process measurments\n");
+        // 从特征队列中获取特征数据
         pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > feature;
         vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
         if(!featureBuf.empty())
@@ -291,24 +298,29 @@ void Estimator::processMeasurements()
             curTime = feature.first + td;
             while(1)
             {
+                // 如果不使用 IMU 或者 IMU 数据可用，则跳出循环
                 if ((!USE_IMU  || IMUAvailable(feature.first + td)))
                     break;
                 else
                 {
                     printf("wait for imu ... \n");
+                    // 如果不使用多线程，则直接返回
                     if (! MULTIPLE_THREAD)
                         return;
+                    // 等待 5 毫秒
                     std::chrono::milliseconds dura(5);
                     std::this_thread::sleep_for(dura);
                 }
             }
             mBuf.lock();
+            // 如果使用 IMU 数据，则获取 IMU 数据
             if(USE_IMU)
                 getIMUInterval(prevTime, curTime, accVector, gyrVector);
 
             featureBuf.pop();
             mBuf.unlock();
 
+            // 如果使用 IMU 数据，并且未初始化过姿态信息，初始化第一帧 IMU 姿态
             if(USE_IMU)
             {
                 if(!initFirstPoseFlag)
@@ -326,27 +338,37 @@ void Estimator::processMeasurements()
                 }
             }
             mProcess.lock();
+            // 处理图像特征数据
             processImage(feature.second, feature.first);
             prevTime = curTime;
 
+            // 打印统计信息
             printStatistics(*this, 0);
 
             std_msgs::Header header;
             header.frame_id = "world";
             header.stamp = ros::Time(feature.first);
 
+            // 发布里程计数据
             pubOdometry(*this, header);
+            // 发布关键位姿数据
             pubKeyPoses(*this, header);
+            // 发布相机姿态数据
             pubCameraPose(*this, header);
+            // 发布点云数据
             pubPointCloud(*this, header);
+            // 发布关键帧数据
             pubKeyframe(*this);
+            // 发布 TF 数据
             pubTF(*this, header);
             mProcess.unlock();
         }
 
+        // 如果不使用多线程，则跳出循环
         if (! MULTIPLE_THREAD)
             break;
 
+        // 等待 2 毫秒
         std::chrono::milliseconds dura(2);
         std::this_thread::sleep_for(dura);
     }
