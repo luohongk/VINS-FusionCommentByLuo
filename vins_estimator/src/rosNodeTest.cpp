@@ -1,8 +1,8 @@
 /*******************************************************
  * Copyright (C) 2019, Aerial Robotics Group, Hong Kong University of Science and Technology
- * 
+ *
  * This file is part of VINS.
- * 
+ *
  * Licensed under the GNU General Public License v3.0;
  * you may not use this file except in compliance with the License.
  *
@@ -43,9 +43,9 @@ void img0_callback(const sensor_msgs::ImageConstPtr &img_msg)
 // 定义一个名为img1_callback的函数，用于处理接收到的图像信息
 void img1_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
-    m_buf.lock(); // 锁定互斥体，以确保线程安全
+    m_buf.lock();           // 锁定互斥体，以确保线程安全
     img1_buf.push(img_msg); // 将接收到的图像信息压入img1_buf队列中
-    m_buf.unlock(); // 解锁互斥体，允许其他线程访问共享资源
+    m_buf.unlock();         // 解锁互斥体，允许其他线程访问共享资源
 }
 // 从ROS消息中获取图像并转换为OpenCV格式的图像
 cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr &img_msg)
@@ -81,59 +81,59 @@ cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr &img_msg)
 // 从两个话题中提取具有相同时间戳的图像
 void sync_process()
 {
-    while(1)
+    while (1)
     {
-        if(STEREO) // 如果使用双目相机
+        if (STEREO) // 如果使用双目相机
         {
-            cv::Mat image0, image1; // 用于存储图像数据
+            cv::Mat image0, image1;  // 用于存储图像数据
             std_msgs::Header header; // 存储图像消息的头信息
-            double time = 0; // 存储时间戳
-            m_buf.lock(); // 加锁以访问图像缓冲区
+            double time = 0;         // 存储时间戳
+            m_buf.lock();            // 加锁以访问图像缓冲区
             if (!img0_buf.empty() && !img1_buf.empty())
             {
                 double time0 = img0_buf.front()->header.stamp.toSec(); // 获取图像1的时间戳
                 double time1 = img1_buf.front()->header.stamp.toSec(); // 获取图像2的时间戳
                 // 0.003秒的时间容差
-                if(time0 < time1 - 0.003) // 如果图像1比图像2早超过了0.003秒
+                if (time0 < time1 - 0.003) // 如果图像1比图像2早超过了0.003秒
                 {
-                    img0_buf.pop(); // 丢弃图像1
+                    img0_buf.pop();         // 丢弃图像1
                     printf("throw img0\n"); // 打印丢弃图像1的消息
                 }
-                else if(time0 > time1 + 0.003) // 如果图像1比图像2晚超过了0.003秒
+                else if (time0 > time1 + 0.003) // 如果图像1比图像2晚超过了0.003秒
                 {
-                    img1_buf.pop(); // 丢弃图像2
+                    img1_buf.pop();         // 丢弃图像2
                     printf("throw img1\n"); // 打印丢弃图像2的消息
                 }
                 else // 如果图像1和图像2的时间戳在容差范围内
                 {
                     time = img0_buf.front()->header.stamp.toSec(); // 使用图像1的时间戳
-                    header = img0_buf.front()->header; // 获取图像1的头信息
-                    image0 = getImageFromMsg(img0_buf.front()); // 获取图像1的数据
-                    img0_buf.pop(); // 弹出图像1
-                    image1 = getImageFromMsg(img1_buf.front()); // 获取图像2的数据
-                    img1_buf.pop(); // 弹出图像2
-                    //printf("find img0 and img1\n");
+                    header = img0_buf.front()->header;             // 获取图像1的头信息
+                    image0 = getImageFromMsg(img0_buf.front());    // 获取图像1的数据
+                    img0_buf.pop();                                // 弹出图像1
+                    image1 = getImageFromMsg(img1_buf.front());    // 获取图像2的数据
+                    img1_buf.pop();                                // 弹出图像2
+                    // printf("find img0 and img1\n");
                 }
             }
-            m_buf.unlock(); // 解锁图像缓冲区
-            if(!image0.empty()) // 如果图像1不为空
+            m_buf.unlock();                                 // 解锁图像缓冲区
+            if (!image0.empty())                            // 如果图像1不为空
                 estimator.inputImage(time, image0, image1); // 将图像数据传递给评估器进行处理
         }
         else // 如果未使用双目相机
         {
-            cv::Mat image; // 用于存储图像数据
+            cv::Mat image;           // 用于存储图像数据
             std_msgs::Header header; // 存储图像消息的头信息
-            double time = 0; // 存储时间戳
-            m_buf.lock(); // 加锁以访问图像缓冲区
-            if(!img0_buf.empty())
+            double time = 0;         // 存储时间戳
+            m_buf.lock();            // 加锁以访问图像缓冲区
+            if (!img0_buf.empty())
             {
                 time = img0_buf.front()->header.stamp.toSec(); // 获取图像的时间戳
-                header = img0_buf.front()->header; // 获取图像的头信息
-                image = getImageFromMsg(img0_buf.front()); // 获取图像的数据
-                img0_buf.pop(); // 弹出图像
+                header = img0_buf.front()->header;             // 获取图像的头信息
+                image = getImageFromMsg(img0_buf.front());     // 获取图像的数据
+                img0_buf.pop();                                // 弹出图像
             }
-            m_buf.unlock(); // 解锁图像缓冲区
-            if(!image.empty()) // 如果图像不为空
+            m_buf.unlock();                        // 解锁图像缓冲区
+            if (!image.empty())                    // 如果图像不为空
                 estimator.inputImage(time, image); // 将图像数据传递给评估器进行处理
         }
 
@@ -141,7 +141,6 @@ void sync_process()
         std::this_thread::sleep_for(dura); // 休眠2毫秒
     }
 }
-
 
 // 传感器回调函数，处理IMU数据
 void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
@@ -165,7 +164,6 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
     return;
 }
 
-
 // 定义了一个名为 feature_callback 的回调函数，用来处理传感器消息中的特征数据
 void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
 {
@@ -187,13 +185,13 @@ void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
         double velocity_x = feature_msg->channels[4].values[i];
         double velocity_y = feature_msg->channels[5].values[i];
         // 如果特征消息中包含更多数据，则获取真实世界中的坐标信息并存储
-        if(feature_msg->channels.size() > 5)
+        if (feature_msg->channels.size() > 5)
         {
             double gx = feature_msg->channels[6].values[i];
             double gy = feature_msg->channels[7].values[i];
             double gz = feature_msg->channels[8].values[i];
             pts_gt[feature_id] = Eigen::Vector3d(gx, gy, gz);
-            //printf("receive pts gt %d %f %f %f\n", feature_id, gx, gy, gz);
+            // printf("receive pts gt %d %f %f %f\n", feature_id, gx, gy, gz);
         }
         // 断言 z 值为 1
         ROS_ASSERT(z == 1);
@@ -201,7 +199,7 @@ void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
         Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
         xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
         // 将特征数据存储到 featureFrame 中
-        featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
+        featureFrame[feature_id].emplace_back(camera_id, xyz_uv_velocity);
     }
     // 获取特征消息的时间戳
     double t = feature_msg->header.stamp.toSec();
@@ -230,17 +228,17 @@ void restart_callback(const std_msgs::BoolConstPtr &restart_msg)
 // imu_switch_callback函数：处理IMU开关状态的回调函数
 void imu_switch_callback(const std_msgs::BoolConstPtr &switch_msg)
 {
-    if (switch_msg->data == true)  // 如果开关状态为真
+    if (switch_msg->data == true) // 如果开关状态为真
     {
-        //ROS_WARN("use IMU!");  // 记录ROS警告：使用IMU！
-        estimator.changeSensorType(1, STEREO);  // 切换为使用IMU的传感器类型
+        // ROS_WARN("use IMU!");  // 记录ROS警告：使用IMU！
+        estimator.changeSensorType(1, STEREO); // 切换为使用IMU的传感器类型
     }
-    else  // 如果开关状态为假
+    else // 如果开关状态为假
     {
-        //ROS_WARN("disable IMU!");  // 记录ROS警告：禁用IMU！
-        estimator.changeSensorType(0, STEREO);  // 切换为禁用IMU的传感器类型
+        // ROS_WARN("disable IMU!");  // 记录ROS警告：禁用IMU！
+        estimator.changeSensorType(0, STEREO); // 切换为禁用IMU的传感器类型
     }
-    return;  // 返回
+    return; // 返回
 }
 
 // 以回调函数的方式处理摄像头切换消息
@@ -270,7 +268,7 @@ int main(int argc, char **argv)
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
 
     // 检查命令行参数个数是否为2
-    if(argc != 2)
+    if (argc != 2)
     {
         // 提示用户正确的命令行参数输入方式
         printf("please intput: rosrun vins vins_node [config file] \n"
@@ -300,7 +298,7 @@ int main(int argc, char **argv)
 
     // 创建IMU数据订阅者
     ros::Subscriber sub_imu;
-    if(USE_IMU)
+    if (USE_IMU)
     {
         // 使用n.subscribe()函数订阅名为IMU_TOPIC的主题，设置队列大小为2000，
         // 并指定imu_callback作为接收到消息时的回调函数，同时使用ros::TransportHints().tcpNoDelay()设置传输选项。
@@ -311,7 +309,7 @@ int main(int argc, char **argv)
     // 创建图像数据订阅者
     ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback);
     ros::Subscriber sub_img1;
-    if(STEREO)
+    if (STEREO)
     {
         sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
     }
