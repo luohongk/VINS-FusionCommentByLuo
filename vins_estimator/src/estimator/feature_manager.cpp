@@ -48,6 +48,11 @@ int FeatureManager::getFeatureCount()
     return cnt;
 }
 
+// 对当前帧与之前帧进行视差比较，如果是当前帧变化很小，就会删去倒数第二帧，如果变化很大，就删去最旧的帧。并把这一帧作为新的关键帧
+// 这样也就保证了划窗内优化的,除了最后一帧可能不是关键帧外,其余的都是关键帧
+// VINS里为了控制优化计算量，在实时情况下，只对当前帧之前某一部分帧进行优化，而不是全部历史帧。局部优化帧的数量就是窗口大小。
+// 为了维持窗口大小，需要去除旧的帧添加新的帧，也就是边缘化 Marginalization。到底是删去最旧的帧（MARGIN_OLD）还是删去刚
+// 刚进来窗口倒数第二帧(MARGIN_SECOND_NEW)
 bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, double td)
 {
     // 输出输入特征数量

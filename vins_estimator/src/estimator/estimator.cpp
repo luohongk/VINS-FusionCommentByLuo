@@ -467,7 +467,17 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
 {
     ROS_DEBUG("new image coming ------------------------------------------"); // 记录调试信息：新图片到达
     ROS_DEBUG("Adding feature points %lu", image.size());                     // 记录调试信息：添加特征点数量
-    if (f_manager.addFeatureCheckParallax(frame_count, image, td))            // 调用f_manager的addFeatureCheckParallax方法
+
+
+    //addFeatureCheckParallax函数解释
+    // 对当前帧与之前帧进行视差比较，如果是当前帧变化很小，就会删去倒数第二帧，如果变化很大，就删去最旧的帧。并把这一帧作为新的关键帧
+    // 这样也就保证了划窗内优化的,除了最后一帧可能不是关键帧外,其余的都是关键帧
+    // VINS里为了控制优化计算量，在实时情况下，只对当前帧之前某一部分帧进行优化，而不是全部历史帧。局部优化帧的数量就是窗口大小。
+    // 为了维持窗口大小，需要去除旧的帧添加新的帧，也就是边缘化 Marginalization。到底是删去最旧的帧（MARGIN_OLD）还是删去刚
+    // 刚进来窗口倒数第二帧(MARGIN_SECOND_NEW)
+
+    // 判断之后,确定marg掉那个帧
+    if (f_manager.addFeatureCheckParallax(frame_count, image, td)) // 调用f_manager的addFeatureCheckParallax方法
     {
         marginalization_flag = MARGIN_OLD; // 将边缘化标志设置为MARGIN_OLD
         // printf("keyframe\n");
