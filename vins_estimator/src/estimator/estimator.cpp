@@ -207,6 +207,8 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
         mBuf.unlock();  // 解锁
 
         TicToc processTime;
+
+        //这里又是一个新的线程，用于处理测量数据，只要有新的一帧放到图像的缓冲区，就会进行测量线程的处理
         processMeasurements();  // 处理测量数据
         printf("process time: %f\n", processTime.toc());  // 打印处理时间
     }
@@ -239,7 +241,7 @@ void Estimator::inputFeature(double t, const map<int, vector<pair<int, Eigen::Ma
         processMeasurements();
 }
 
-
+// Estimator类的成员函数，用于获取指定时间范围内的IMU数据
 bool Estimator::getIMUInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d>> &accVector, 
                                 vector<pair<double, Eigen::Vector3d>> &gyrVector)
 {
@@ -248,15 +250,19 @@ bool Estimator::getIMUInterval(double t0, double t1, vector<pair<double, Eigen::
         printf("not receive imu\n");
         return false;
     }
+    // 若IMU数据为空，则输出提示信息并返回false
     //printf("get imu from %f %f\n", t0, t1);
     //printf("imu fornt time %f   imu end time %f\n", accBuf.front().first, accBuf.back().first);
+    // 如果 t1 小于等于缓冲区accBuf中最后一条IMU数据的时间戳
     if(t1 <= accBuf.back().first)
     {
+        // 移除时间戳小于等于 t0 的IMU数据
         while (accBuf.front().first <= t0)
         {
             accBuf.pop();
             gyrBuf.pop();
         }
+        // 将时间戳在 t0 与 t1 之间的IMU数据存入accVector和gyrVector中
         while (accBuf.front().first < t1)
         {
             accVector.push_back(accBuf.front());
@@ -264,6 +270,7 @@ bool Estimator::getIMUInterval(double t0, double t1, vector<pair<double, Eigen::
             gyrVector.push_back(gyrBuf.front());
             gyrBuf.pop();
         }
+        // 存入时间戳为 t1 的IMU数据
         accVector.push_back(accBuf.front());
         gyrVector.push_back(gyrBuf.front());
     }
@@ -290,11 +297,21 @@ void Estimator::processMeasurements()
     {
         //printf("process measurments\n");
         // 从特征队列中获取特征数据
+        //这个里面的double代表的是时间戳，map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>>代表的是特征帧数据
         pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > feature;
+
+        // 这两个变量存储的是加速度与角速度
         vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
+
+        // 判断特征帧缓冲区是否存在值，如果存在数据的话就进行处理
         if(!featureBuf.empty())
         {
+            // 获取缓冲区队列头的特征帧数据
             feature = featureBuf.front();
+
+            // mark feature.first就是每一帧对应的时间戳，td是代表什么意思呢？
+            // done 这个td是从配置文件config里面读取出来的，表示对时间戳进行一个时间矫正，这样变成一个真实的时间
+            // mark 但是我没想通的地方是，为什么td初始化是0？？？
             curTime = feature.first + td;
             while(1)
             {
@@ -315,8 +332,10 @@ void Estimator::processMeasurements()
             mBuf.lock();
             // 如果使用 IMU 数据，则获取 IMU 数据
             if(USE_IMU)
+                // 获取加速度与角速度到accVector, gyrVector，这里采用引用传递，函数内部的值变了，这个accVector, gyrVector跟着变
                 getIMUInterval(prevTime, curTime, accVector, gyrVector);
-
+            
+            // 特征帧缓冲区第一个数据出队
             featureBuf.pop();
             mBuf.unlock();
 
@@ -337,6 +356,7 @@ void Estimator::processMeasurements()
                     processIMU(accVector[i].first, dt, accVector[i].second, gyrVector[i].second);
                 }
             }
+
             mProcess.lock();
             // 处理图像特征数据
             processImage(feature.second, feature.first);
@@ -441,173 +461,200 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
     gyr_0 = angular_velocity; 
 }
 
+// 在Estimator类中的processImage方法里添加注释
 void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header)
 {
-    ROS_DEBUG("new image coming ------------------------------------------");
-    ROS_DEBUG("Adding feature points %lu", image.size());
-    if (f_manager.addFeatureCheckParallax(frame_count, image, td))
+    ROS_DEBUG("new image coming ------------------------------------------");  // 记录调试信息：新图片到达
+    ROS_DEBUG("Adding feature points %lu", image.size());  // 记录调试信息：添加特征点数量
+    if (f_manager.addFeatureCheckParallax(frame_count, image, td))  // 调用f_manager的addFeatureCheckParallax方法
     {
-        marginalization_flag = MARGIN_OLD;
+        marginalization_flag = MARGIN_OLD;  // 将边缘化标志设置为MARGIN_OLD
         //printf("keyframe\n");
     }
     else
     {
-        marginalization_flag = MARGIN_SECOND_NEW;
+        marginalization_flag = MARGIN_SECOND_NEW;  // 将边缘化标志设置为MARGIN_SECOND_NEW
         //printf("non-keyframe\n");
     }
 
-    ROS_DEBUG("%s", marginalization_flag ? "Non-keyframe" : "Keyframe");
-    ROS_DEBUG("Solving %d", frame_count);
-    ROS_DEBUG("number of feature: %d", f_manager.getFeatureCount());
-    Headers[frame_count] = header;
+    ROS_DEBUG("%s", marginalization_flag ? "Non-keyframe" : "Keyframe");  // 根据边缘化标志记录调试信息
+    ROS_DEBUG("Solving %d", frame_count);  // 记录调试信息：解算帧数
+    ROS_DEBUG("number of feature: %d", f_manager.getFeatureCount());  // 记录调试信息：特征点数量
+    Headers[frame_count] = header;  // 将Headers数组的第frame_count个元素设置为header
 
-    ImageFrame imageframe(image, header);
-    imageframe.pre_integration = tmp_pre_integration;
-    all_image_frame.insert(make_pair(header, imageframe));
-    tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
+    ImageFrame imageframe(image, header);  // 创建ImageFrame对象
+    imageframe.pre_integration = tmp_pre_integration;  // 设置imageframe的预积分属性
+    all_image_frame.insert(make_pair(header, imageframe));  // 将imageframe插入到all_image_frame中
 
-    if(ESTIMATE_EXTRINSIC == 2)
+    tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};  // 创建IntegrationBase对象
+
+    if(ESTIMATE_EXTRINSIC == 2)  // 如果ESTIMATE_EXTRINSIC等于2
     {
-        ROS_INFO("calibrating extrinsic param, rotation movement is needed");
-        if (frame_count != 0)
+        ROS_INFO("calibrating extrinsic param, rotation movement is needed");  // 记录信息：校准外参，需要旋转运动
+        if (frame_count != 0)  // 如果帧数不为0
         {
-            vector<pair<Vector3d, Vector3d>> corres = f_manager.getCorresponding(frame_count - 1, frame_count);
-            Matrix3d calib_ric;
-            if (initial_ex_rotation.CalibrationExRotation(corres, pre_integrations[frame_count]->delta_q, calib_ric))
+            vector<pair<Vector3d, Vector3d>> corres = f_manager.getCorresponding(frame_count - 1, frame_count);  // 获取对应的特征点
+            Matrix3d calib_ric;  // 创建Matrix3d对象calib_ric
+            if (initial_ex_rotation.CalibrationExRotation(corres, pre_integrations[frame_count]->delta_q, calib_ric))  // 调用initial_ex_rotation的CalibrationExRotation方法
             {
-                ROS_WARN("initial extrinsic rotation calib success");
-                ROS_WARN_STREAM("initial extrinsic rotation: " << endl << calib_ric);
-                ric[0] = calib_ric;
-                RIC[0] = calib_ric;
-                ESTIMATE_EXTRINSIC = 1;
+                ROS_WARN("initial extrinsic rotation calib success");  // 记录警告信息：初始外参旋转校准成功
+                ROS_WARN_STREAM("initial extrinsic rotation: " << endl << calib_ric);  // 记录警告信息：初始外参旋转
+                ric[0] = calib_ric;  // 将ric数组的第一个元素设置为calib_ric
+                RIC[0] = calib_ric;  // 将RIC数组的第一个元素设置为calib_ric
+                ESTIMATE_EXTRINSIC = 1;  // 将ESTIMATE_EXTRINSIC设置为1
             }
         }
     }
 
+    // 当求解器标志为INITIAL时执行以下代码
     if (solver_flag == INITIAL)
     {
-        // monocular + IMU initilization
+        // 单目+IMU初始化
         if (!STEREO && USE_IMU)
         {
+            // 若帧计数等于窗口大小
             if (frame_count == WINDOW_SIZE)
             {
                 bool result = false;
-                if(ESTIMATE_EXTRINSIC != 2 && (header - initial_timestamp) > 0.1)
+                // 若ESTIMATE_EXTRINSIC不为2并且（当前时间戳 - 初始时间戳）大于0.1
+                if (ESTIMATE_EXTRINSIC != 2 && (header - initial_timestamp) > 0.1)
                 {
-                    result = initialStructure();
-                    initial_timestamp = header;   
+                    result = initialStructure();  // 执行结构初始化
+                    initial_timestamp = header;   // 更新初始时间戳
                 }
                 if(result)
                 {
-                    optimization();
-                    updateLatestStates();
-                    solver_flag = NON_LINEAR;
-                    slideWindow();
-                    ROS_INFO("Initialization finish!");
+                    optimization();  // 执行优化
+                    updateLatestStates();  // 更新最新状态
+                    solver_flag = NON_LINEAR;  // 更新求解器标志为非线性
+                    slideWindow();  // 滑动窗口
+                    ROS_INFO("Initialization finish!");  // 输出初始化完成信息
                 }
                 else
-                    slideWindow();
+                    slideWindow();  // 滑动窗口
             }
         }
-
-        // stereo + IMU initilization
+    
+        // 双目+IMU初始化
         if(STEREO && USE_IMU)
         {
-            f_manager.initFramePoseByPnP(frame_count, Ps, Rs, tic, ric);
-            f_manager.triangulate(frame_count, Ps, Rs, tic, ric);
+            f_manager.initFramePoseByPnP(frame_count, Ps, Rs, tic, ric);  // 通过PnP初始化帧姿态
+            f_manager.triangulate(frame_count, Ps, Rs, tic, ric);  // 三角化
             if (frame_count == WINDOW_SIZE)
             {
-                map<double, ImageFrame>::iterator frame_it;
+                map<double, ImageFrame>::iterator frame_it;  // 使用迭代器遍历所有图像帧
                 int i = 0;
                 for (frame_it = all_image_frame.begin(); frame_it != all_image_frame.end(); frame_it++)
                 {
-                    frame_it->second.R = Rs[i];
-                    frame_it->second.T = Ps[i];
+                    frame_it->second.R = Rs[i];  // 更新图像帧旋转矩阵
+                    frame_it->second.T = Ps[i];  // 更新图像帧平移向量
                     i++;
                 }
-                solveGyroscopeBias(all_image_frame, Bgs);
+                solveGyroscopeBias(all_image_frame, Bgs);  // 解算陀螺仪偏置
                 for (int i = 0; i <= WINDOW_SIZE; i++)
                 {
-                    pre_integrations[i]->repropagate(Vector3d::Zero(), Bgs[i]);
+                    pre_integrations[i]->repropagate(Vector3d::Zero(), Bgs[i]);  // 重新积分
                 }
-                optimization();
-                updateLatestStates();
-                solver_flag = NON_LINEAR;
-                slideWindow();
-                ROS_INFO("Initialization finish!");
+                optimization();  // 执行优化
+                updateLatestStates();  // 更新最新状态
+                solver_flag = NON_LINEAR;  // 更新求解器标志为非线性
+                slideWindow();  // 滑动窗口
+                ROS_INFO("Initialization finish!");  // 输出初始化完成信息
             }
         }
-
-        // stereo only initilization
+    
+        // 双目单目初始化
         if(STEREO && !USE_IMU)
         {
-            f_manager.initFramePoseByPnP(frame_count, Ps, Rs, tic, ric);
-            f_manager.triangulate(frame_count, Ps, Rs, tic, ric);
-            optimization();
-
+            f_manager.initFramePoseByPnP(frame_count, Ps, Rs, tic, ric);  // 通过PnP初始化帧姿态
+            f_manager.triangulate(frame_count, Ps, Rs, tic, ric);  // 三角化
+            optimization();  // 执行优化
+    
             if(frame_count == WINDOW_SIZE)
             {
-                optimization();
-                updateLatestStates();
-                solver_flag = NON_LINEAR;
-                slideWindow();
-                ROS_INFO("Initialization finish!");
+                optimization();  // 执行优化
+                updateLatestStates();  // 更新最新状态
+                solver_flag = NON_LINEAR;  // 更新求解器标志为非线性
+                slideWindow();  // 滑动窗口
+                ROS_INFO("Initialization finish!");  // 输出初始化完成信息
             }
         }
-
+    
         if(frame_count < WINDOW_SIZE)
         {
-            frame_count++;
+            frame_count++;  // 帧计数加一
             int prev_frame = frame_count - 1;
-            Ps[frame_count] = Ps[prev_frame];
-            Vs[frame_count] = Vs[prev_frame];
-            Rs[frame_count] = Rs[prev_frame];
-            Bas[frame_count] = Bas[prev_frame];
-            Bgs[frame_count] = Bgs[prev_frame];
+            Ps[frame_count] = Ps[prev_frame];  // 更新平移向量
+            Vs[frame_count] = Vs[prev_frame];  // 更新速度
+            Rs[frame_count] = Rs[prev_frame];  // 更新旋转矩阵
+            Bas[frame_count] = Bas[prev_frame];  // 更新加速度计偏置
+            Bgs[frame_count] = Bgs[prev_frame];  // 更新陀螺仪偏置
         }
-
     }
+
+
+    // 如果不是第一帧，则执行以下操作
     else
     {
+        // 计时求解器执行时间
         TicToc t_solve;
+        // 若不使用IMU，则通过PnP初始化帧姿态
         if(!USE_IMU)
             f_manager.initFramePoseByPnP(frame_count, Ps, Rs, tic, ric);
+        // 三角化特征点
         f_manager.triangulate(frame_count, Ps, Rs, tic, ric);
+        // 优化
         optimization();
+        // 移除索引
         set<int> removeIndex;
+        // 进行异常值剔除
         outliersRejection(removeIndex);
+        // 移除特征点异常值
         f_manager.removeOutlier(removeIndex);
+        // 若不使用多线程
         if (! MULTIPLE_THREAD)
         {
+            // 移除特征点跟踪异常值
             featureTracker.removeOutliers(removeIndex);
+            // 预测下一帧的特征点位置
             predictPtsInNextFrame();
         }
             
+        // 输出求解器耗时
         ROS_DEBUG("solver costs: %fms", t_solve.toc());
-
+    
+        // 进行失败检测
         if (failureDetection())
         {
+            // 输出警告信息
             ROS_WARN("failure detection!");
+            // 发生失败
             failure_occur = 1;
+            // 清空状态
             clearState();
+            // 设置参数
             setParameter();
+            // 输出警告信息
             ROS_WARN("system reboot!");
             return;
         }
-
+    
+        // 滑动窗口
         slideWindow();
+        // 移除失败的特征点
         f_manager.removeFailures();
-        // prepare output of VINS
+        // 准备输出VINS的数据
         key_poses.clear();
         for (int i = 0; i <= WINDOW_SIZE; i++)
             key_poses.push_back(Ps[i]);
-
+    
+        // 更新最新的姿态
         last_R = Rs[WINDOW_SIZE];
         last_P = Ps[WINDOW_SIZE];
         last_R0 = Rs[0];
         last_P0 = Ps[0];
         updateLatestStates();
-    }  
+    }
 }
 
 bool Estimator::initialStructure()
