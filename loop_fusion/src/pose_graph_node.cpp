@@ -242,60 +242,63 @@ void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     m_process.unlock();
 }
 
+// 在函数process()中实现了从消息缓存中提取传感器数据的逻辑
 void process()
 {
     while (true)
     {
-        sensor_msgs::ImageConstPtr image_msg = NULL;
-        sensor_msgs::PointCloudConstPtr point_msg = NULL;
-        nav_msgs::Odometry::ConstPtr pose_msg = NULL;
+        sensor_msgs::ImageConstPtr image_msg = NULL;  // 初始化图像消息指针为空
+        sensor_msgs::PointCloudConstPtr point_msg = NULL;  // 初始化点云消息指针为空
+        nav_msgs::Odometry::ConstPtr pose_msg = NULL;  // 初始化姿态消息指针为空
 
-        // find out the messages with same time stamp
-        m_buf.lock();
-        if(!image_buf.empty() && !point_buf.empty() && !pose_buf.empty())
+        // 查找具有相同时间戳的消息
+        m_buf.lock();  // 加锁以避免并发访问消息缓存
+        // 消息缓存中提取具有相同时间戳的图像、点云和姿态消息，并进行相应处理。
+        // 目的是在处理图像、点云和姿态消息时，确保时间戳的一致性。
+        // 它会根据消息的时间戳来决定哪些消息是有效的，哪些需要被丢弃，以保证数据同步的准确性。
+        if(!image_buf.empty() && !point_buf.empty() && !pose_buf.empty())  // 检查消息缓存非空
         {
             if (image_buf.front()->header.stamp.toSec() > pose_buf.front()->header.stamp.toSec())
             {
                 pose_buf.pop();
-                printf("throw pose at beginning\n");
+                printf("throw pose at beginning\n");  // 打印丢弃姿态消息的提示信息
             }
             else if (image_buf.front()->header.stamp.toSec() > point_buf.front()->header.stamp.toSec())
             {
                 point_buf.pop();
-                printf("throw point at beginning\n");
+                printf("throw point at beginning\n");  // 打印丢弃点云消息的提示信息
             }
             else if (image_buf.back()->header.stamp.toSec() >= pose_buf.front()->header.stamp.toSec() 
                 && point_buf.back()->header.stamp.toSec() >= pose_buf.front()->header.stamp.toSec())
             {
-                pose_msg = pose_buf.front();
-                pose_buf.pop();
-                while (!pose_buf.empty())
+                pose_msg = pose_buf.front();  // 从姿态消息缓存中提取消息
+                pose_buf.pop();  // 弹出姿态消息缓存中的消息
+                while (!pose_buf.empty())  // 清空姿态消息缓存
                     pose_buf.pop();
-                while (image_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())
+                while (image_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())  // 从图像消息缓存中弹出早于当前姿态消息的消息
                     image_buf.pop();
-                image_msg = image_buf.front();
-                image_buf.pop();
+                image_msg = image_buf.front();  // 从图像消息缓存中提取消息
+                image_buf.pop();  // 弹出图像消息缓存中的消息
 
-                while (point_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())
+                while (point_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())  // 从点云消息缓存中弹出早于当前姿态消息的消息
                     point_buf.pop();
-                point_msg = point_buf.front();
-                point_buf.pop();
+                point_msg = point_buf.front();  // 从点云消息缓存中提取消息
+                point_buf.pop();  // 弹出点云消息缓存中的消息
             }
         }
-        m_buf.unlock();
+        m_buf.unlock();  // 解锁消息缓存
 
+        // 当pose_msg不为空时执行以下操作
         if (pose_msg != NULL)
         {
-            //printf(" pose time %f \n", pose_msg->header.stamp.toSec());
-            //printf(" point time %f \n", point_msg->header.stamp.toSec());
-            //printf(" image time %f \n", image_msg->header.stamp.toSec());
-            // skip fisrt few
+            // 如果是第一帧数据，跳过前几帧
             if (skip_first_cnt < SKIP_FIRST_CNT)
             {
                 skip_first_cnt++;
                 continue;
             }
-
+        
+            // 跳过指定数量的帧，当帧计数器大于
             if (skip_cnt < SKIP_CNT)
             {
                 skip_cnt++;
@@ -305,10 +308,15 @@ void process()
             {
                 skip_cnt = 0;
             }
-
+        
+            // 获取图像数据
+            // 声明一个cv_bridge::CvImageConstPtr类型的指针ptr，用于存储图像数据。
             cv_bridge::CvImageConstPtr ptr;
+
+            // 检查传入的图像消息的编码是否为单通道灰度图像（8UC1）
             if (image_msg->encoding == "8UC1")
             {
+                // 创建一个新的sensor_msgs::Image类型的变量img，用于存储转换后的图像数据。
                 sensor_msgs::Image img;
                 img.header = image_msg->header;
                 img.height = image_msg->height;
@@ -317,35 +325,51 @@ void process()
                 img.step = image_msg->step;
                 img.data = image_msg->data;
                 img.encoding = "mono8";
+
+                // 使用cv_bridge库将img转换为OpenCV可以处理的图像格式，并赋值给ptr。
                 ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
             }
             else
                 ptr = cv_bridge::toCvCopy(image_msg, sensor_msgs::image_encodings::MONO8);
-            
+        
             cv::Mat image = ptr->image;
-            // build keyframe
+        
+            // 构建关键帧
+            // 从姿态消息pose_msg中提取位置信息，创建一个三维向量T，表示相机的位置。
             Vector3d T = Vector3d(pose_msg->pose.pose.position.x,
                                   pose_msg->pose.pose.position.y,
                                   pose_msg->pose.pose.position.z);
+
+            // 从姿态消息中提取四元数，并将其转换为旋转矩阵R，表示相机的旋转。
             Matrix3d R = Quaterniond(pose_msg->pose.pose.orientation.w,
                                      pose_msg->pose.pose.orientation.x,
                                      pose_msg->pose.pose.orientation.y,
                                      pose_msg->pose.pose.orientation.z).toRotationMatrix();
+            // 如果相机位置变化超过指定阈值，执行以下操作
+            // 计算当前相机位置T与上一次处理的关键帧位置last_t之间的欧几里得距离。
+            // 如果这个距离大于某个预设的阈值SKIP_DIS，则认为相机移动足够多，需要构建一个新的关键帧。
+
+            // mark SKIP_DIS是0,所以这个判断有什么意义吗
             if((T - last_t).norm() > SKIP_DIS)
             {
+                // 处理3D点和对应的2D像素坐标
+                // 定义几个向量，用于存储处理后的3D点、对应的2D像素坐标、点的ID等信息。
                 vector<cv::Point3f> point_3d; 
                 vector<cv::Point2f> point_2d_uv; 
                 vector<cv::Point2f> point_2d_normal;
                 vector<double> point_id;
-
+        
+                // 处理点云数据
                 for (unsigned int i = 0; i < point_msg->points.size(); i++)
                 {
+                    // 首先创建一个cv::Point3f对象p_3d，用于存储3D点的坐标。
                     cv::Point3f p_3d;
                     p_3d.x = point_msg->points[i].x;
                     p_3d.y = point_msg->points[i].y;
                     p_3d.z = point_msg->points[i].z;
                     point_3d.push_back(p_3d);
-
+        
+                    // 创建两个cv::Point2f对象p_2d_uv和p_2d_normal，分别用于存储2D像素坐标和2D法线坐标。
                     cv::Point2f p_2d_uv, p_2d_normal;
                     double p_id;
                     p_2d_normal.x = point_msg->channels[i].values[0];
@@ -356,20 +380,25 @@ void process()
                     point_2d_normal.push_back(p_2d_normal);
                     point_2d_uv.push_back(p_2d_uv);
                     point_id.push_back(p_id);
-
-                    //printf("u %f, v %f \n", p_2d_uv.x, p_2d_uv.y);
                 }
-
+        
+                // 创建关键帧对象
+                // 使用提取的信息创建一个新的关键帧对象。
+                // 关键帧对象通常包含了时间戳、帧索引、位置、旋转、图像数据、3D点、2D像素坐标、2D法线坐标和点的ID等信息。
                 KeyFrame* keyframe = new KeyFrame(pose_msg->header.stamp.toSec(), frame_index, T, R, image,
                                    point_3d, point_2d_uv, point_2d_normal, point_id, sequence);   
+                // 多线程保护
                 m_process.lock();
                 start_flag = 1;
+
+                // 将新创建的关键帧添加到某个位姿图
                 posegraph.addKeyFrame(keyframe, 1);
                 m_process.unlock();
                 frame_index++;
                 last_t = T;
             }
         }
+        // 返回空值
         std::chrono::milliseconds dura(5);
         std::this_thread::sleep_for(dura);
     }
@@ -397,17 +426,23 @@ void command()
     }
 }
 
+// 主函数
 int main(int argc, char **argv)
 {
+    // 初始化 ROS
     ros::init(argc, argv, "loop_fusion");
     ros::NodeHandle n("~");
+    
+    // 注册发布器
     posegraph.registerPub(n);
     
+    // 设置可视化偏移量和跳帧参数
     VISUALIZATION_SHIFT_X = 0;
     VISUALIZATION_SHIFT_Y = 0;
     SKIP_CNT = 0;
     SKIP_DIS = 0;
 
+    // 检查命令行参数数量
     if(argc != 2)
     {
         printf("please intput: rosrun loop_fusion loop_fusion_node [config file] \n"
@@ -416,6 +451,7 @@ int main(int argc, char **argv)
         return 0;
     }
     
+    // 读取配置文件
     string config_file = argv[1];
     printf("config_file: %s\n", argv[1]);
 
@@ -425,22 +461,27 @@ int main(int argc, char **argv)
         std::cerr << "ERROR: Wrong path to settings" << std::endl;
     }
 
+    // 设置相机姿态可视化参数
     cameraposevisual.setScale(0.1);
     cameraposevisual.setLineWidth(0.01);
 
+    // 读取图像高度和宽度
     std::string IMAGE_TOPIC;
     int LOAD_PREVIOUS_POSE_GRAPH;
-
     ROW = fsSettings["image_height"];
     COL = fsSettings["image_width"];
+
+    // 获取包路径并设置词汇表文件路径
     std::string pkg_path = ros::package::getPath("loop_fusion");
     string vocabulary_file = pkg_path + "/../support_files/brief_k10L6.bin";
     cout << "vocabulary_file" << vocabulary_file << endl;
     posegraph.loadVocabulary(vocabulary_file);
 
+    // 设置 BRIEF_PATTERN_FILE 路径
     BRIEF_PATTERN_FILE = pkg_path + "/../support_files/brief_pattern.yml";
     cout << "BRIEF_PATTERN_FILE" << BRIEF_PATTERN_FILE << endl;
 
+    // 获取相机标定文件路径并生成相机对象
     int pn = config_file.find_last_of('/');
     std::string configPath = config_file.substr(0, pn);
     std::string cam0Calib;
@@ -449,20 +490,24 @@ int main(int argc, char **argv)
     printf("cam calib path: %s\n", cam0Path.c_str());
     m_camera = camodocal::CameraFactory::instance()->generateCameraFromYamlFile(cam0Path.c_str());
 
+    // 读取其余配置参数
     fsSettings["image0_topic"] >> IMAGE_TOPIC;        
     fsSettings["pose_graph_save_path"] >> POSE_GRAPH_SAVE_PATH;
     fsSettings["output_path"] >> VINS_RESULT_PATH;
     fsSettings["save_image"] >> DEBUG_IMAGE;
 
+    // 读取是否加载上一帧位姿图的标志
     LOAD_PREVIOUS_POSE_GRAPH = fsSettings["load_previous_pose_graph"];
     VINS_RESULT_PATH = VINS_RESULT_PATH + "/vio_loop.csv";
     std::ofstream fout(VINS_RESULT_PATH, std::ios::out);
     fout.close();
 
+    // 读取是否使用 IMU 的标志
     int USE_IMU = fsSettings["imu"];
     posegraph.setIMUFlag(USE_IMU);
     fsSettings.release();
 
+    // 根据标志加载上一帧位姿图或设置加载标志
     if (LOAD_PREVIOUS_POSE_GRAPH)
     {
         printf("load pose graph\n");
@@ -478,6 +523,7 @@ int main(int argc, char **argv)
         load_flag = 1;
     }
 
+    // 订阅各种传感器数据的话题并发布结果
     ros::Subscriber sub_vio = n.subscribe("/vins_estimator/odometry", 2000, vio_callback);
     ros::Subscriber sub_image = n.subscribe(IMAGE_TOPIC, 2000, image_callback);
     ros::Subscriber sub_pose = n.subscribe("/vins_estimator/keyframe_pose", 2000, pose_callback);
@@ -491,13 +537,15 @@ int main(int argc, char **argv)
     pub_margin_cloud = n.advertise<sensor_msgs::PointCloud>("margin_cloud_loop_rect", 1000);
     pub_odometry_rect = n.advertise<nav_msgs::Odometry>("odometry_rect", 1000);
 
+    // 创建测量和键盘命令处理线程
     std::thread measurement_process;
     std::thread keyboard_command_process;
-
     measurement_process = std::thread(process);
     keyboard_command_process = std::thread(command);
     
+    // 进入 ROS 事件循环
     ros::spin();
 
+    // 返回 0
     return 0;
 }
