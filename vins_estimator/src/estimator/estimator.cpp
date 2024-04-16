@@ -476,7 +476,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
     // 为了维持窗口大小，需要去除旧的帧添加新的帧，也就是边缘化 Marginalization。到底是删去最旧的帧（MARGIN_OLD）还是删去刚
     // 刚进来窗口倒数第二帧(MARGIN_SECOND_NEW)
 
-    // 判断之后,确定marg掉那个帧
+    // 判断之后,确定marg掉哪个帧
     if (f_manager.addFeatureCheckParallax(frame_count, image, td)) // 调用f_manager的addFeatureCheckParallax方法
     {
         marginalization_flag = MARGIN_OLD; // 将边缘化标志设置为MARGIN_OLD
