@@ -68,8 +68,11 @@ void PoseGraph::loadVocabulary(std::string voc_path)
 void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
 {
     //shift to base frame
+    // 首先定义了一些变量vio_P_cur和vio_R_cur，类型为Vector3d和Matrix3d，用于存储当前关键帧的位姿信息。
     Vector3d vio_P_cur;
     Matrix3d vio_R_cur;
+
+    // mark sequence_cnt是指什么？？？
     if (sequence_cnt != cur_kf->sequence)
     {
         sequence_cnt++;
@@ -82,16 +85,28 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
         m_drift.unlock();
     }
     
+    // 获取当前关键帧的视觉+惯性导航（VIO）位姿vio_P_cur和vio_R_cur。
     cur_kf->getVioPose(vio_P_cur, vio_R_cur);
+
+    // 将vio_P_cur从相机坐标系转换到世界坐标系，这里使用了之前计算得到的世界旋转矩阵w_r_vio和平移向量w_t_vio。
     vio_P_cur = w_r_vio * vio_P_cur + w_t_vio;
+
+    // 将vio_R_cur从相机坐标系转换到世界坐标系。
     vio_R_cur = w_r_vio *  vio_R_cur;
+
+    // 更新当前关键帧的VIO位姿。
     cur_kf->updateVioPose(vio_P_cur, vio_R_cur);
+
+    // 为当前关键帧分配一个全局索引global_index，然后将global_index递增。
     cur_kf->index = global_index;
     global_index++;
 	int loop_index = -1;
+
+    // flag_detect_loop为1，执行回环检测模块，这里的参数是从config文件读取的回环检测参数。
     if (flag_detect_loop)
     {
         TicToc tmp_t;
+        // 执行回环检测
         loop_index = detectLoop(cur_kf, cur_kf->index);
     }
     else
