@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="R_pgzjEuonbMSohD37CX" name="第 1 页">
-        <mxGraphModel dx="764" dy="706" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1660" dy="1468" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -94,14 +94,53 @@
                 <mxCell id="30" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;" parent="1" vertex="1">
                     <mxGeometry x="670" y="140" width="70" height="100" as="geometry"/>
                 </mxCell>
-                <mxCell id="31" value="addKeyFrame" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                <mxCell id="31" value="addKeyFrame" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
                     <mxGeometry x="655" y="20" width="100" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="32" value="执行回环检测detectloop" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="32" value="执行回环检测detectloop" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="650" y="250" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="33" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;" vertex="1" parent="1">
+                <mxCell id="33" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;" parent="1" vertex="1">
                     <mxGeometry x="670" y="330" width="70" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="34" value="将位姿转化为世界坐标系" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="645" y="440" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="35" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;" vertex="1" parent="1">
+                    <mxGeometry x="665" y="520" width="70" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="36" value="绘制回环链接的图" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="640" y="630" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="38" value="" style="endArrow=classic;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="32">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="810" y="270" as="sourcePoint"/>
+                        <mxPoint x="840" y="70" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="39" value="detectloop" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                    <mxGeometry x="900" y="25" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="40" value="进行关键帧的图像压缩" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="880" y="55" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="41" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;" vertex="1" parent="1">
+                    <mxGeometry x="900" y="130" width="70" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="42" value="&lt;font color=&quot;#dd4646&quot;&gt;从前50帧中查询与当前关键帧最接近的4个关键帧的分数(这里也不一定是4个，是至多4个)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FBD6FF;" vertex="1" parent="1">
+                    <mxGeometry x="865" y="240" width="140" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="43" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;" vertex="1" parent="1">
+                    <mxGeometry x="900" y="340" width="70" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="44" value="可视化回环检测结果" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="875" y="450" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="45" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;direction=south;notch=0;" vertex="1" parent="1">
+                    <mxGeometry x="900" y="530" width="70" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="46" value="查找分数小于0.015且索引最小的回环帧" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="875" y="640" width="120" height="60" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
