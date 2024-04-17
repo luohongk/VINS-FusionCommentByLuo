@@ -347,21 +347,40 @@ KeyFrame* PoseGraph::getKeyFrame(int index)
         return NULL;
 }
 
+// 这段代码是PoseGraph类的detectLoop函数的实现。
+// 该函数用于检测回环，接受一个关键帧指针keyframe和帧索引frame_index作为输入，返回回环关键帧的索引。
 int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
 {
     // put image into image_pool; for visualization
+    // 将图像放入image_pool
     cv::Mat compressed_image;
     if (DEBUG_IMAGE)
     {
+        // 获取关键帧的特征点数量
         int feature_num = keyframe->keypoints.size();
+
+        // 将关键帧的原始图像缩放到指定大小
         cv::resize(keyframe->image, compressed_image, cv::Size(376, 240));
+
+        // 在图像中放入一些文本内容，显示特征点的数量，设置相应的文本位置参数
         putText(compressed_image, "feature_num:" + to_string(feature_num), cv::Point2f(10, 10), CV_FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255));
+        
+        // 将压缩后的图像保存到image_pool中
         image_pool[frame_index] = compressed_image;
     }
+
+    //对运行时间进行计数
     TicToc tmp_t;
     //first query; then add this frame into database!
+
+    // 定义了一个QueryResults对象，用于保存查询结果。
     QueryResults ret;
     TicToc t_query;
+
+    //keyframe->brief_descriptors是指当前关键帧的描述子
+    //ret是指返回查询的结果，表示最近的4个得分？？
+    //4是指返回的最大的相思图像的个数
+    //frame_index - 50表述的是查询的范围，即查询当前关键帧之前的50帧
     db.query(keyframe->brief_descriptors, ret, 4, frame_index - 50);
     //printf("query time: %f", t_query.toc());
     //cout << "Searching for Image " << frame_index << ". " << ret << endl;
@@ -372,8 +391,10 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
     // ret[0] is the nearest neighbour's score. threshold change with neighour score
     bool find_loop = false;
     cv::Mat loop_result;
+
     if (DEBUG_IMAGE)
     {
+        // 这个是指压缩后的原始图像
         loop_result = compressed_image.clone();
         if (ret.size() > 0)
             putText(loop_result, "neighbour score:" + to_string(ret[0].Score), cv::Point2f(10, 50), CV_FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255));
@@ -383,6 +404,7 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
     {
         for (unsigned int i = 0; i < ret.size(); i++)
         {
+            // 回环检测最近的图像，并且增加一些文字说明
             int tmp_index = ret[i].Id;
             auto it = image_pool.find(tmp_index);
             cv::Mat tmp_image = (it->second).clone();
@@ -391,10 +413,15 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
         }
     }
     // a good match with its nerghbour
+    // 它检查查询结果是否至少包含一个邻居（相似的关键帧），
+    // 并且第一个邻居的分数是否大于0.05。如果满足条件，那么就会执行后续的循环。
     if (ret.size() >= 1 &&ret[0].Score > 0.05)
+
+        // 遍历所有查找到的邻居信息
         for (unsigned int i = 1; i < ret.size(); i++)
         {
             //if (ret[i].Score > ret[0].Score * 0.3)
+            // 如果邻居的分数能够大于0.015，那么就认为找到了回环。
             if (ret[i].Score > 0.015)
             {          
                 find_loop = true;
@@ -416,8 +443,14 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
         cv::waitKey(20);
     }
 */
+    // 这个地方表示需要找到回环的图片且帧索引要大于50
+    // mark 意味着前50帧不进行回环？？？
     if (find_loop && frame_index > 50)
     {
+        // 查找分数大于0.015且索引最小的那个邻居
+        //为什么要是最小索引？
+        //最小索引意味着是最老的帧
+        //帧越老，误差累计越少
         int min_index = -1;
         for (unsigned int i = 0; i < ret.size(); i++)
         {
