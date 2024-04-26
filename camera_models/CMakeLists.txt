@@ -22,10 +22,10 @@ find_package(Boost REQUIRED COMPONENTS filesystem program_options system)
 include_directories(${Boost_INCLUDE_DIRS})
 
 # 查找OpenCV库
-find_package(OpenCV REQUIRED)
+find_package(OpenCV 3 REQUIRED)
 
 # 查找Ceres库
-find_package(Ceres REQUIRED)
+find_package(Ceres REQUIRED PATHS "/home/lhk/Thirdparty/Ceres")
 # 包含Ceres库的头文件路径
 include_directories(${CERES_INCLUDE_DIRS})
 

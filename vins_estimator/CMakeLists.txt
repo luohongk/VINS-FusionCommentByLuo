@@ -24,7 +24,7 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(OpenCV REQUIRED)
 
 # 查找 Ceres 库
-find_package(Ceres REQUIRED)
+find_package(Ceres REQUIRED PATHS "/home/lhk/Thirdparty/Ceres")
 
 # 包含相关的头文件路径
 include_directories(${catkin_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS})
