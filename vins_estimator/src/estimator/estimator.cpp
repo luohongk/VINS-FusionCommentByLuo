@@ -428,6 +428,7 @@ void Estimator::initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r)
 
 void Estimator::processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
 {
+    // 检查 是不是第一个接受到IMU数据
     if (!first_imu)
     {
         first_imu = true;
@@ -435,29 +436,42 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
         gyr_0 = angular_velocity;
     }
 
+    // 检查当前帧是不是已经有预积分的一些变量
     if (!pre_integrations[frame_count])
     {
         pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
     }
+    // 如果当前帧不是第一帧，就计算下面的，把预积分的一些数据保存好存到pre_integrations中
     if (frame_count != 0)
     {
         pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity);
         // if(solver_flag != NON_LINEAR)
         tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity);
 
+        // 保存时间戳列表
         dt_buf[frame_count].push_back(dt);
+
+        // 保存加速度与角加速度列表
         linear_acceleration_buf[frame_count].push_back(linear_acceleration);
         angular_velocity_buf[frame_count].push_back(angular_velocity);
 
         int j = frame_count;
+
+        // 未校准的加速度与角速度
         Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g;
         Vector3d un_gyr = 0.5 * (gyr_0 + angular_velocity) - Bgs[j];
+
+        // 似乎是根据未校准的角速度和时间增量 dt 来进行旋转矩阵的更新操作。
         Rs[j] *= Utility::deltaQ(un_gyr * dt).toRotationMatrix();
         Vector3d un_acc_1 = Rs[j] * (linear_acceleration - Bas[j]) - g;
         Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
+
+        // 对位置进行更新
         Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
         Vs[j] += dt * un_acc;
     }
+
+    // 把当前时刻的加速度与角速度进行更新，在下一个dt时间段内进行更新
     acc_0 = linear_acceleration;
     gyr_0 = angular_velocity;
 }
@@ -468,13 +482,12 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
     ROS_DEBUG("new image coming ------------------------------------------"); // 记录调试信息：新图片到达
     ROS_DEBUG("Adding feature points %lu", image.size());                     // 记录调试信息：添加特征点数量
 
-
-    //addFeatureCheckParallax函数解释
-    // 对当前帧与之前帧进行视差比较，如果是当前帧变化很小，就会删去倒数第二帧，如果变化很大，就删去最旧的帧。并把这一帧作为新的关键帧
-    // 这样也就保证了划窗内优化的,除了最后一帧可能不是关键帧外,其余的都是关键帧
-    // VINS里为了控制优化计算量，在实时情况下，只对当前帧之前某一部分帧进行优化，而不是全部历史帧。局部优化帧的数量就是窗口大小。
-    // 为了维持窗口大小，需要去除旧的帧添加新的帧，也就是边缘化 Marginalization。到底是删去最旧的帧（MARGIN_OLD）还是删去刚
-    // 刚进来窗口倒数第二帧(MARGIN_SECOND_NEW)
+    // addFeatureCheckParallax函数解释
+    //  对当前帧与之前帧进行视差比较，如果是当前帧变化很小，就会删去倒数第二帧，如果变化很大，就删去最旧的帧。并把这一帧作为新的关键帧
+    //  这样也就保证了划窗内优化的,除了最后一帧可能不是关键帧外,其余的都是关键帧
+    //  VINS里为了控制优化计算量，在实时情况下，只对当前帧之前某一部分帧进行优化，而不是全部历史帧。局部优化帧的数量就是窗口大小。
+    //  为了维持窗口大小，需要去除旧的帧添加新的帧，也就是边缘化 Marginalization。到底是删去最旧的帧（MARGIN_OLD）还是删去刚
+    //  刚进来窗口倒数第二帧(MARGIN_SECOND_NEW)
 
     // 判断之后,确定marg掉哪个帧
     if (f_manager.addFeatureCheckParallax(frame_count, image, td)) // 调用f_manager的addFeatureCheckParallax方法
