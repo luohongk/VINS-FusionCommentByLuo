@@ -106,7 +106,7 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
 }
 ```
 
-对于这个积分是怎么个预积分法呢？？可以看到预积分传入的参数是一个时间戳，一个dt(也就是需要计算积分的时间间隔)，两个已经存了IMU数据的容器。具体的预积分的函数倒是没有几行代码。首先对first_imu进行判断，如果是第一次接受到imu数据，就初始化一下这个 acc_0， gyr_0。这里主要说说不是第一次接受到imu数据如何计算的，首先一些数据的保存就不用说了,比较关键的地方在于如下几行代码
+对于这个积分是怎么个预积分法呢？？可以看到预积分传入的参数是一个时间戳，一个dt(也就是需要计算积分的时间间隔)，两个已经存了IMU数据的容器。具体的预积分的函数倒是没有几行代码。首先对first_imu进行判断，如果是第一次接受到imu数据，就初始化一下这个 acc_0， gyr_0。这里主要说说非第一次接受到imu数据如何计算的，首先一些数据的保存就不用说了,比较关键的地方在于如下几行代码就是预积分的核心（篇幅原因，可以自己慢慢啃一肯预积分)
 
 ```C++
         int j = frame_count;
@@ -125,5 +125,6 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
         Vs[j] += dt * un_acc;
 ```
 
+预积分结束，接下来进行图像处理模块，预积分最后可以得到每一帧初始位姿。在processimage模块中，传进去的就是图像的时间戳与图像的特征。首先进行第一步**addFeatureCheckParallax**的处理。传入这是第几帧，这个帧的图像特征，这个td是指当前帧与上一帧的时间差。
 
-
+这个函数addFeatureCheckParallax主要就是有关关键帧的选取与边缘化这个边缘化的策略是这样的，

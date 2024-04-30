@@ -396,26 +396,29 @@ void Estimator::processMeasurements()
     }
 }
 
+// 初始化第一个IMU姿势
 void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector)
 {
-    printf("init first imu pose\n");
-    initFirstPoseFlag = true;
-    // return;
-    Eigen::Vector3d averAcc(0, 0, 0);
-    int n = (int)accVector.size();
-    for (size_t i = 0; i < accVector.size(); i++)
+    printf("init first imu pose\n");  // 打印消息
+    initFirstPoseFlag = true;  // 设置初始化标志为true
+    // return;  // 返回
+    
+    Eigen::Vector3d averAcc(0, 0, 0);  // 初始化平均加速度向量
+    int n = (int)accVector.size();  // 获取加速度向量的大小
+    for (size_t i = 0; i < accVector.size(); i++)  // 遍历加速度向量
     {
-        averAcc = averAcc + accVector[i].second;
+        averAcc = averAcc + accVector[i].second;  // 计算加速度向量的和
     }
-    averAcc = averAcc / n;
-    printf("averge acc %f %f %f\n", averAcc.x(), averAcc.y(), averAcc.z());
-    Matrix3d R0 = Utility::g2R(averAcc);
-    double yaw = Utility::R2ypr(R0).x();
-    R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
-    Rs[0] = R0;
-    cout << "init R0 " << endl
-         << Rs[0] << endl;
-    // Vs[0] = Vector3d(5, 0, 0);
+    averAcc = averAcc / n;  // 计算平均加速度
+    printf("averge acc %f %f %f\n", averAcc.x(), averAcc.y(), averAcc.z());  // 打印平均加速度信息
+
+    // mark 为什么要用偏航角修正呢？？？
+    Matrix3d R0 = Utility::g2R(averAcc);  // 计算对应的旋转矩阵
+    double yaw = Utility::R2ypr(R0).x();  // 获取偏航角
+    R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;  // 修正旋转矩阵
+    Rs[0] = R0;  // 存储旋转矩阵
+    cout << "init R0 " << endl << Rs[0] << endl;  // 打印旋转矩阵信息
+    // Vs[0] = Vector3d(5, 0, 0);  // 设置速度状态量
 }
 
 void Estimator::initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r)
@@ -459,6 +462,8 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
 
         // 未校准的加速度与角速度
         Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g;
+
+        // mark IMU预积分当前时刻中值法的离散形式
         Vector3d un_gyr = 0.5 * (gyr_0 + angular_velocity) - Bgs[j];
 
         // 似乎是根据未校准的角速度和时间增量 dt 来进行旋转矩阵的更新操作。
