@@ -399,25 +399,26 @@ void Estimator::processMeasurements()
 // 初始化第一个IMU姿势
 void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector)
 {
-    printf("init first imu pose\n");  // 打印消息
-    initFirstPoseFlag = true;  // 设置初始化标志为true
+    printf("init first imu pose\n"); // 打印消息
+    initFirstPoseFlag = true;        // 设置初始化标志为true
     // return;  // 返回
-    
-    Eigen::Vector3d averAcc(0, 0, 0);  // 初始化平均加速度向量
-    int n = (int)accVector.size();  // 获取加速度向量的大小
-    for (size_t i = 0; i < accVector.size(); i++)  // 遍历加速度向量
+
+    Eigen::Vector3d averAcc(0, 0, 0);             // 初始化平均加速度向量
+    int n = (int)accVector.size();                // 获取加速度向量的大小
+    for (size_t i = 0; i < accVector.size(); i++) // 遍历加速度向量
     {
-        averAcc = averAcc + accVector[i].second;  // 计算加速度向量的和
+        averAcc = averAcc + accVector[i].second; // 计算加速度向量的和
     }
-    averAcc = averAcc / n;  // 计算平均加速度
-    printf("averge acc %f %f %f\n", averAcc.x(), averAcc.y(), averAcc.z());  // 打印平均加速度信息
+    averAcc = averAcc / n;                                                  // 计算平均加速度
+    printf("averge acc %f %f %f\n", averAcc.x(), averAcc.y(), averAcc.z()); // 打印平均加速度信息
 
     // mark 为什么要用偏航角修正呢？？？
-    Matrix3d R0 = Utility::g2R(averAcc);  // 计算对应的旋转矩阵
-    double yaw = Utility::R2ypr(R0).x();  // 获取偏航角
-    R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;  // 修正旋转矩阵
-    Rs[0] = R0;  // 存储旋转矩阵
-    cout << "init R0 " << endl << Rs[0] << endl;  // 打印旋转矩阵信息
+    Matrix3d R0 = Utility::g2R(averAcc);                   // 计算对应的旋转矩阵
+    double yaw = Utility::R2ypr(R0).x();                   // 获取偏航角
+    R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0; // 修正旋转矩阵
+    Rs[0] = R0;                                            // 存储旋转矩阵
+    cout << "init R0 " << endl
+         << Rs[0] << endl; // 打印旋转矩阵信息
     // Vs[0] = Vector3d(5, 0, 0);  // 设置速度状态量
 }
 
@@ -509,47 +510,71 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
     ROS_DEBUG("%s", marginalization_flag ? "Non-keyframe" : "Keyframe"); // 根据边缘化标志记录调试信息
     ROS_DEBUG("Solving %d", frame_count);                                // 记录调试信息：解算帧数
     ROS_DEBUG("number of feature: %d", f_manager.getFeatureCount());     // 记录调试信息：特征点数量
-    Headers[frame_count] = header;                                       // 将Headers数组的第frame_count个元素设置为header
 
+    // 保留时间戳
+    Headers[frame_count] = header; // 将Headers数组的第frame_count个
+
+    // 这里的几个操作貌似是一帧数据特征的保存工作
     ImageFrame imageframe(image, header);                  // 创建ImageFrame对象
     imageframe.pre_integration = tmp_pre_integration;      // 设置imageframe的预积分属性
     all_image_frame.insert(make_pair(header, imageframe)); // 将imageframe插入到all_image_frame中
 
+    // 这里创建了一个临时的预积分对象
     tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]}; // 创建IntegrationBase对象
 
     if (ESTIMATE_EXTRINSIC == 2) // 如果ESTIMATE_EXTRINSIC等于2
     {
-        ROS_INFO("calibrating extrinsic param, rotation movement is needed"); // 记录信息：校准外参，需要旋转运动
-        if (frame_count != 0)                                                 // 如果帧数不为0
+        // 校准外参参数，需要进行旋转运动
+        ROS_INFO("calibrating extrinsic param, rotation movement is needed");
+        if (frame_count != 0) // 如果帧数不为0
         {
-            vector<pair<Vector3d, Vector3d>> corres = f_manager.getCorresponding(frame_count - 1, frame_count);       // 获取对应的特征点
-            Matrix3d calib_ric;                                                                                       // 创建Matrix3d对象calib_ric
+            // 这里面存储的是新图像与上一帧图像的特征点对(这里应该是需要有公共地图点才能配对)
+            // 获取对应的特征点
+            vector<pair<Vector3d, Vector3d>> corres = f_manager.getCorresponding(frame_count - 1, frame_count);
+
+            // 创建Matrix3d对象calib_ric
+            Matrix3d calib_ric;
+
+            // 这里有这个函数CalibrationExRotation进行相机校准，如果校准成功的话，就输出校准信息
+            // 并且将校准后的值给赋值给RIC
             if (initial_ex_rotation.CalibrationExRotation(corres, pre_integrations[frame_count]->delta_q, calib_ric)) // 调用initial_ex_rotation的CalibrationExRotation方法
             {
-                ROS_WARN("initial extrinsic rotation calib success"); // 记录警告信息：初始外参旋转校准成功
+                // 记录警告信息：初始外参旋转校准成功
+                ROS_WARN("initial extrinsic rotation calib success");
+
+                // 记录警告信息：初始外参旋转
                 ROS_WARN_STREAM("initial extrinsic rotation: " << endl
-                                                               << calib_ric); // 记录警告信息：初始外参旋转
-                ric[0] = calib_ric;                                           // 将ric数组的第一个元素设置为calib_ric
-                RIC[0] = calib_ric;                                           // 将RIC数组的第一个元素设置为calib_ric
-                ESTIMATE_EXTRINSIC = 1;                                       // 将ESTIMATE_EXTRINSIC设置为1
+                                                               << calib_ric);
+
+                // 将ric数组的第一个元素设置为calib_ric
+                ric[0] = calib_ric;
+
+                // 将RIC数组的第一个元素设置为calib_ric
+                RIC[0] = calib_ric;
+
+                // 将ESTIMATE_EXTRINSIC设置为1
+                ESTIMATE_EXTRINSIC = 1;
             }
         }
     }
 
     // 当求解器标志为INITIAL时执行以下代码
+    // 初始的时候solver_flag就是INITIAL，这是对第一帧的操作，初始化
     if (solver_flag == INITIAL)
     {
         // 单目+IMU初始化
         if (!STEREO && USE_IMU)
         {
-            // 若帧计数等于窗口大小
+            // 若帧计数等于窗口大小，默认WINDOW_SIZE是10，也就是10帧为一个滑动窗口
+            // 这里的意思是只有等到第10帧的时候才开始第一次优化
             if (frame_count == WINDOW_SIZE)
             {
                 bool result = false;
-                // 若ESTIMATE_EXTRINSIC不为2并且（当前时间戳 - 初始时间戳）大于0.1
+                // 若ESTIMATE_EXTRINSIC不为2，这个表示有外参，并且（当前时间戳 - 初始时间戳）大于0.1
+                // initial_timestamp初始化为0了
                 if (ESTIMATE_EXTRINSIC != 2 && (header - initial_timestamp) > 0.1)
                 {
-                    result = initialStructure(); // 执行结构初始化
+                    result = initialStructure(); // 执行初始化
                     initial_timestamp = header;  // 更新初始时间戳
                 }
                 if (result)
@@ -690,9 +715,12 @@ bool Estimator::initialStructure()
 {
     TicToc t_sfm;
     // check imu observibility
+    // 检查IMU的可观测性
     {
         map<double, ImageFrame>::iterator frame_it;
         Vector3d sum_g;
+        // 遍历所有的之前的图像帧(应该是包含当前帧)
+        // 这里貌似是在计算加速度的和
         for (frame_it = all_image_frame.begin(), frame_it++; frame_it != all_image_frame.end(); frame_it++)
         {
             double dt = frame_it->second.pre_integration->sum_dt;
@@ -700,7 +728,11 @@ bool Estimator::initialStructure()
             sum_g += tmp_g;
         }
         Vector3d aver_g;
+
+        // 计算平均加速度
         aver_g = sum_g * 1.0 / ((int)all_image_frame.size() - 1);
+
+        // 存储加速度方差的容器
         double var = 0;
         for (frame_it = all_image_frame.begin(), frame_it++; frame_it != all_image_frame.end(); frame_it++)
         {
@@ -709,36 +741,76 @@ bool Estimator::initialStructure()
             var += (tmp_g - aver_g).transpose() * (tmp_g - aver_g);
             // cout << "frame g " << tmp_g.transpose() << endl;
         }
+        // 计算加速度的标准差
         var = sqrt(var / ((int)all_image_frame.size() - 1));
         // ROS_WARN("IMU variation %f!", var);
+
+        // 如果加速度的标准差小于0.25，则输出一条信息表明IMU的激励不足
         if (var < 0.25)
         {
             ROS_INFO("IMU excitation not enouth!");
             // return false;
         }
     }
-    // global sfm
+    // global sfm（Structure from Motion）
+    // 从运动中重建出三维场景
+
+    // 定义了一个名为 Q 的数组，用于存储帧之间的旋转信息，其中 frame_count 是帧的总数。
     Quaterniond Q[frame_count + 1];
+
+    // 定义了一个名为 T 的数组，用于存储帧之间的平移信息。
     Vector3d T[frame_count + 1];
+
+    // 定义了一个名为 sfm_tracked_points 的映射，用于存储SFM中跟踪的特征点的三维坐标。
     map<int, Vector3d> sfm_tracked_points;
+
+    // 定义了一个名为 sfm_f 的向量，用于存储SFM中提取的特征点及其观测。
     vector<SFMFeature> sfm_f;
+
+    // 对特征管理器中的每个特征进行遍历。
+    // 实际上就是要搞清楚某一个地图点对应的哪些像素的特征点
+    // 将f_manager中的所有feature保存到vector<SFMFeature> sfm_f中
+    //     struct SFMFeature 其存放的是特征点的信息
+    // {
+    //     bool state;//状态（是否被三角化）
+    //     int id;
+    //     vector<pair<int,Vector2d>> observation;//所有观测到该地图点的图像帧ID和图像坐标
+    //     double position[3];//3d坐标
+    //     double depth;//深度
+    // };
     for (auto &it_per_id : f_manager.feature)
     {
+        // 获取特征的起始帧索引。
         int imu_j = it_per_id.start_frame - 1;
+
+        // 定义了一个临时特征对象
         SFMFeature tmp_feature;
         tmp_feature.state = false;
         tmp_feature.id = it_per_id.feature_id;
+
+        // 每一个地图点所对应的很多帧帧，每一帧进行遍历
         for (auto &it_per_frame : it_per_id.feature_per_frame)
         {
             imu_j++;
+            // 获取特征在当前帧中的二维像素坐标。
             Vector3d pts_j = it_per_frame.point;
+
+            // 将IMU帧索引和特征的二维观测值添加到临时特征的观测列表中。
             tmp_feature.observation.push_back(make_pair(imu_j, Eigen::Vector2d{pts_j.x(), pts_j.y()}));
         }
         sfm_f.push_back(tmp_feature);
     }
+
+    // 定义了一个名为 relative_R 的3x3矩阵，用于存储相对旋转信息。
     Matrix3d relative_R;
+
+    // 定义了一个名为 relative_T 的三维向量，用于存储相对平移信息。
     Vector3d relative_T;
     int l;
+
+    // 调用一个函数 relativePose() 来计算相对姿态信息，如果计算失败则执行下一步。
+    // 保证具有足够的视差,由E矩阵恢复R、t
+    // 这里的第L帧是从第一帧开始到滑动窗口中第一个满足与当前帧的平均视差足够大的帧，会作为参考帧到下面的全局sfm使用，得到的Rt为当前帧到第l帧的坐标系变换Rt
     if (!relativePose(relative_R, relative_T, l))
     {
         ROS_INFO("Not enough features or parallax; Move device around");

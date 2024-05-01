@@ -127,4 +127,122 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
 
 预积分结束，接下来进行图像处理模块，预积分最后可以得到每一帧初始位姿。在processimage模块中，传进去的就是图像的时间戳与图像的特征。首先进行第一步**addFeatureCheckParallax**的处理。传入这是第几帧，这个帧的图像特征，这个td是指当前帧与上一帧的时间差。
 
-这个函数addFeatureCheckParallax主要就是有关关键帧的选取与边缘化这个边缘化的策略是这样的，
+```C++
+bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, double td)
+{
+    // 输出输入特征数量
+    ROS_DEBUG("input feature: %d", (int)image.size());
+    // 输出当前特征数量
+    ROS_DEBUG("num of feature: %d", getFeatureCount());
+
+    // 初始化视差和特征数
+
+    // 总视差
+    double parallax_sum = 0;
+
+    // 次新帧与次次新帧中的共同特征的数量
+    int parallax_num = 0;
+
+    // 被跟踪点的个数，非新特征点的个数
+    last_track_num = 0;
+    last_average_parallax = 0;
+    new_feature_num = 0;
+    long_track_num = 0;
+
+    // 遍历传入的图像特征
+    for (auto &id_pts : image)
+    {
+        // 创建当前帧的特征对象
+        FeaturePerFrame f_per_fra(id_pts.second[0].second, td);
+        // 判断是不是单目数据
+
+        // assert语句用于进行断言检查，以确保条件为真。如果断言条件为假，程序将终止并生成一个错误消息。
+        // 一般来说都是真哈，这里就相当于上了一个保险
+        assert(id_pts.second[0].first == 0);
+
+        // 如果特征点数量为2，添加右侧观测。因为开始构造特征帧的时候就是先构造左目，后构造右目
+        // 构造的时候都把他们俩放到了特征容器里面，具体就去看trackImage()
+        if (id_pts.second.size() == 2)
+        {
+            // 如果是双目的话，就把右目的数据放入到f_per_fra这个对象之中
+            f_per_fra.rightObservation(id_pts.second[1].second);
+
+            // assert语句用于进行断言检查，以确保条件为真。如果断言条件为假，程序将终止并生成一个错误消息。
+            // 一般来说都是真哈，这里就相当于上了一个保险
+            assert(id_pts.second[1].first == 1);
+        }
+
+        // 获取特征id
+        // id_pts.first就是对于每一帧而言的特征点的ID
+        // 与其说是特征点的ID,不如说是地图点的ID,因为其实左目右目的特征点对应的是同一个地图点，那么这个特征ID是一样的
+        int feature_id = id_pts.first;
+
+        // 查找特征id在特征数组中的位置，每一个地图点都分配一个全局ID
+        // 这里的这个feature相当于是维护的一个feature的数据库
+        // 每次新来一帧都要去这个数据库里面找之前的特征，如果没有，就添加一个新的特征
+        auto it = find_if(feature.begin(), feature.end(), [feature_id](const FeaturePerId &it)
+                          { return it.feature_id == feature_id; });
+
+        // 如果遍历结束了，都没找到这个feature,那么就把
+        if (it == feature.end())
+        {
+            // 把当前特征放入feature数据库中，方便下一帧来了在进行查找（其实也就相当于新加了一个地图点）
+            feature.push_back(FeaturePerId(feature_id, frame_count));
+
+            // 这里如果有右目的话说就把右边目数据放入feature最后一个容器对象的feature_per_frame中？？
+            feature.back().feature_per_frame.push_back(f_per_fra);
+            new_feature_num++;
+        }
+        // 如果特征id存在，说明左目已经放了数据了，则将前面构造好的特征对象添加至特征数组对应的特征id处
+        // 这样每次如果新加入了一个特征，就在指定ID中加入一个，方便与计算这个ID对应的地图点是由多少个帧共同看到的。
+        else if (it->feature_id == feature_id)
+        {
+            // 直接把右目数据放进入
+            it->feature_per_frame.push_back(f_per_fra);
+
+            // 这个表示当前特征如果有四个帧都看到了这个特征所对应的地图点，那就在last_track_num自增1
+            // 这里基本能够表示当前帧与历史帧的相似度，如果last_track_num越大，那肯定相似性越高
+            last_track_num++;
+            // 计算长时间跟踪的特征数量
+            if (it->feature_per_frame.size() >= 4)
+                long_track_num++;
+        }
+    }
+
+    // 如果满足某些条件，则返回true，这就表明这个帧属于关键帧了，那么会边缘化窗口内最旧的一帧
+    // # mark 这个关键帧选取的条件有点迷
+    if (frame_count < 2 || last_track_num < 20 || long_track_num < 40 || new_feature_num > 0.5 * last_track_num)
+        return true;
+
+    // 计算能被当前帧和其前两帧共同看到的特征点视差
+    for (auto &it_per_id : feature)
+    {
+        // 判断特征是否在帧范围内并计算视差
+        if (it_per_id.start_frame <= frame_count - 2 &&
+            it_per_id.start_frame + int(it_per_id.feature_per_frame.size()) - 1 >= frame_count - 1)
+        {
+            parallax_sum += compensatedParallax2(it_per_id, frame_count);
+            parallax_num++;
+        }
+    }
+
+    // 若视差数为0，则返回true
+    // 如果视差为0，说明当前帧和其前两帧压根就没有共同观测到的地图点。直接就是关键帧
+    if (parallax_num == 0)
+    {
+        return true;
+    }
+
+    // 如果有共同观测到的地图点，那么就看看这个视差大不大，如果视差还比较大的话，那么就
+    // 也当作关键帧，边缘化最旧的一帧
+    else
+    {
+        ROS_DEBUG("parallax_sum: %lf, parallax_num: %d", parallax_sum, parallax_num);
+        ROS_DEBUG("current parallax: %lf", parallax_sum / parallax_num * FOCAL_LENGTH);
+        last_average_parallax = parallax_sum / parallax_num * FOCAL_LENGTH;
+        return parallax_sum / parallax_num >= MIN_PARALLAX;
+    }
+}
+```
+
+这个函数addFeatureCheckParallax主要就是有关关键帧的选取与边缘化这个边缘化的策略是这样的，主要就是计算视差，如果当前帧与前两帧压根没有公共地图点（视差为0)，或者视差大于一个阈值，表示当前帧与前两帧的图像差距非常大，因此需要边缘化最后旧一帧（也就是关键帧，因为此时的新帧要设置成关键帧了)。否则就边缘化倒数第二旧的一帧。完了之后就进行相机校准。
