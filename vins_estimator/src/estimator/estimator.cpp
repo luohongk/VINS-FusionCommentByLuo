@@ -903,95 +903,160 @@ bool Estimator::initialStructure()
     }
 }
 
+// 在函数级别添加注释
+// Estimator 类的 visualInitialAlign 方法
 bool Estimator::visualInitialAlign()
 {
+    // 计时器对象 t_g
     TicToc t_g;
+
+    // 向量 x 用于存储结果
     VectorXd x;
-    // solve scale
+
+    // 解决尺度问题
+    // 调用 VisualIMUAlignment 方法，解决视觉IMU对准问题
     bool result = VisualIMUAlignment(all_image_frame, Bgs, g, x);
-    if (!result)
+    if (!result) // 如果解决失败
     {
-        ROS_DEBUG("solve g failed!");
-        return false;
+        ROS_DEBUG("solve g failed!"); // 输出调试信息
+        return false;                 // 返回假值
     }
 
-    // change state
+    // 更改状态
+    // 循环处理每帧图像
     for (int i = 0; i <= frame_count; i++)
     {
+        // 获取旋转矩阵
         Matrix3d Ri = all_image_frame[Headers[i]].R;
+
+        // 获取平移向量
         Vector3d Pi = all_image_frame[Headers[i]].T;
+
+        // 存储平移向量
         Ps[i] = Pi;
+
+        // 存储旋转矩阵
         Rs[i] = Ri;
+
+        // 设置为关键帧
         all_image_frame[Headers[i]].is_key_frame = true;
     }
 
+    // 获取尺度参数
     double s = (x.tail<1>())(0);
+
+    // 循环处理每个窗口
     for (int i = 0; i <= WINDOW_SIZE; i++)
     {
+        // 重新计算积分
         pre_integrations[i]->repropagate(Vector3d::Zero(), Bgs[i]);
     }
+    // 倒序处理每帧图像,更新平移向量
     for (int i = frame_count; i >= 0; i--)
         Ps[i] = s * Ps[i] - Rs[i] * TIC[0] - (s * Ps[0] - Rs[0] * TIC[0]);
+
+    // 关键帧索引
     int kv = -1;
+
+    // 迭代器
     map<double, ImageFrame>::iterator frame_i;
+
+    // 遍历所有图像帧
     for (frame_i = all_image_frame.begin(); frame_i != all_image_frame.end(); frame_i++)
     {
+        // 如果是关键帧
         if (frame_i->second.is_key_frame)
         {
+            // 关键帧索引自增
             kv++;
+
+            // 计算速度
             Vs[kv] = frame_i->second.R * x.segment<3>(kv * 3);
         }
     }
 
+    // 根据重力向量得到旋转矩阵
     Matrix3d R0 = Utility::g2R(g);
+
+    // 计算偏航角
     double yaw = Utility::R2ypr(R0 * Rs[0]).x();
+
+    // 更新旋转矩阵
     R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
+
+    // 更新重力向量
     g = R0 * g;
-    // Matrix3d rot_diff = R0 * Rs[0].transpose();
+
+    // 计算旋转差异
     Matrix3d rot_diff = R0;
+
+    // 循环处理每帧
     for (int i = 0; i <= frame_count; i++)
     {
-        Ps[i] = rot_diff * Ps[i];
-        Rs[i] = rot_diff * Rs[i];
-        Vs[i] = rot_diff * Vs[i];
+        Ps[i] = rot_diff * Ps[i]; // 更新平移向量
+        Rs[i] = rot_diff * Rs[i]; // 更新旋转矩阵
+        Vs[i] = rot_diff * Vs[i]; // 更新速度
     }
+
+    // 输出调试信息
     ROS_DEBUG_STREAM("g0     " << g.transpose());
+
+    // 输出调试信息
     ROS_DEBUG_STREAM("my R0  " << Utility::R2ypr(Rs[0]).transpose());
 
+    // 清除深度信息
     f_manager.clearDepth();
+
+    // 三角化重构特征点
     f_manager.triangulate(frame_count, Ps, Rs, tic, ric);
 
+    // 返回真值
     return true;
 }
 
+// Estimator 类中的 relativePose 方法用于寻找相对位姿
+// 这个函数的目标是在窗口内寻找与最新帧具有足够匹配点和视差的先前帧
 bool Estimator::relativePose(Matrix3d &relative_R, Vector3d &relative_T, int &l)
 {
-    // find previous frame which contians enough correspondance and parallex with newest frame
+    // 寻找包含足够匹配和最新帧有足够视差的先前帧
     for (int i = 0; i < WINDOW_SIZE; i++)
     {
         vector<pair<Vector3d, Vector3d>> corres;
+
+        // 对于每一个先前的帧，获取与最新帧的匹配点对儿
         corres = f_manager.getCorresponding(i, WINDOW_SIZE);
+
+        // 如果匹配点数大于20
         if (corres.size() > 20)
         {
             double sum_parallax = 0;
             double average_parallax;
             for (int j = 0; j < int(corres.size()); j++)
             {
+                // 计算所有匹配点对的视差（平均3D点之间的距离）。
                 Vector2d pts_0(corres[j].first(0), corres[j].first(1));
                 Vector2d pts_1(corres[j].second(0), corres[j].second(1));
+
+                // 计算视差
+                // 相机的不同位置拍摄的图像中同一个物体在像素坐标上的差异。
+                // 简而言之就是地图点在像素平面投影的差异
                 double parallax = (pts_0 - pts_1).norm();
                 sum_parallax = sum_parallax + parallax;
             }
+
+            // 计算平均视差
             average_parallax = 1.0 * sum_parallax / int(corres.size());
+
+            // 如果平均视差乘以460大于30，并且使用匹配点对求解相对旋转矩阵和平移向量成功
             if (average_parallax * 460 > 30 && m_estimator.solveRelativeRT(corres, relative_R, relative_T))
             {
-                l = i;
+                l = i; // 设置 l 为当前帧
                 ROS_DEBUG("average_parallax %f choose l %d and newest frame to triangulate the whole structure", average_parallax * 460, l);
-                return true;
+                return true; // 返回 true 表示成功找到符合条件的帧
             }
         }
     }
-    return false;
+    return false; // 未找到符合条件的帧，返回 false
 }
 
 void Estimator::vector2double()
@@ -1758,6 +1823,10 @@ void Estimator::fastPredictIMU(double t, Eigen::Vector3d linear_acceleration, Ei
     latest_gyr_0 = angular_velocity;
 }
 
+// 主要功能是在多线程环境下更新最新的状态信息。它先获取互斥锁确保状态更新期间的数据一致性，
+// 然后根据当前帧的数据更新最新的时间戳、位置、姿态、速度、加速度偏置、陀螺仪偏置和初始传感器数据。
+// 接下来，它从加速度和陀螺仪缓冲区中读取数据，并调用fastPredictIMU()函数进行快速预测，更新预测的状态。
+// 最后，释放互斥锁，完成状态更新过程。
 void Estimator::updateLatestStates()
 {
     mPropagate.lock();
