@@ -52,6 +52,24 @@ int FeatureManager::getFeatureCount()
 // VINS里为了控制优化计算量，在实时情况下，只对当前帧之前某一部分帧进行优化，而不是全部历史帧。局部优化帧的数量就是窗口大小。
 // 为了维持窗口大小，需要去除旧的帧添加新的帧，也就是边缘化 Marginalization。到底是删去最旧的帧（MARGIN_OLD）还是删去刚
 // 刚进来窗口倒数第二帧(MARGIN_SECOND_NEW)
+
+/*
+首先，迭代 image 即当前帧检测到的每个路标点 id，feature 队列中是否包含，
+    若不含，则添加到 feature 队列中；
+    若包含，则添加到对应 id 的 FeaturePerFrame 队列。
+然后，compensatedParallax2 计算每个路标点在两幅图中的视差量，
+    若视差量大于某个阈值或者当前帧跟踪的路标点小于某个阈值，则边缘化滑窗内最老的帧；
+    否则，边缘化掉次新帧，即倒数第二帧。
+
+    1、遍历图像image中所有的特征点
+    2、保存这个特征点在这一帧中的信息
+    3、迭代器寻找feature list中是否有这feature_id
+    4、如果没有则新建一个，并添加这图像帧
+    5、有的话把图像帧添加进去
+    6、计算每个特征在次新帧和次次新帧中的视差
+    7、决定当前帧是否为关键帧
+*/
+
 bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, double td)
 {
     // 输出输入特征数量
@@ -304,20 +322,32 @@ bool FeatureManager::solvePoseByPnP(Eigen::Matrix3d &R, Eigen::Vector3d &P,
     return true;
 }
 
+/*
+    1、获得3D-2D的对应关系
+    2、获得上一帧相机到世界系的R、t
+    3、Epnp获得当前相机到世界系的R、t
+    4、转换为当前IMU系到世界系的R、t  ==>> （保存到 Rs、Ps）
+*/
 void FeatureManager::initFramePoseByPnP(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vector3d tic[], Matrix3d ric[])
 {
 
+    // step 1 获得3D-2D的对应关系
     if (frameCnt > 0)
     {
         vector<cv::Point2f> pts2D;
         vector<cv::Point3f> pts3D;
         for (auto &it_per_id : feature)
         {
+            // 找到被三角化后有逆深度的点
             if (it_per_id.estimated_depth > 0)
             {
+                // index = 当前帧ID - 特征点起始帧ID
                 int index = frameCnt - it_per_id.start_frame;
+
+                // 若特征点被观测次数 >= index, 说明次特征点在前后帧匹配上了(即index+1 = frameCnt)
                 if ((int)it_per_id.feature_per_frame.size() >= index + 1)
                 {
+                    // 获得此特征点在IMU坐标系下的3D坐标，然后转换到世界坐标
                     Vector3d ptsInCam = ric[0] * (it_per_id.feature_per_frame[0].point * it_per_id.estimated_depth) + tic[0];
                     Vector3d ptsInWorld = Rs[it_per_id.start_frame] * ptsInCam + Ps[it_per_id.start_frame];
 
@@ -328,15 +358,20 @@ void FeatureManager::initFramePoseByPnP(int frameCnt, Vector3d Ps[], Matrix3d Rs
                 }
             }
         }
+
+        // step 2 获得上一帧相机到世界系的R、t
         Eigen::Matrix3d RCam;
         Eigen::Vector3d PCam;
         // trans to w_T_cam
         RCam = Rs[frameCnt - 1] * ric[0];
         PCam = Rs[frameCnt - 1] * tic[0] + Ps[frameCnt - 1];
 
+        // step 3 Epnp获得当前相机到世界系的R、t
         if (solvePoseByPnP(RCam, PCam, pts2D, pts3D))
         {
             // trans to w_T_imu
+
+            // 转换为当前IMU系到世界系的R、t
             Rs[frameCnt] = RCam * ric[0].transpose();
             Ps[frameCnt] = -RCam * ric[0].transpose() * tic[0] + PCam;
 
@@ -349,13 +384,17 @@ void FeatureManager::initFramePoseByPnP(int frameCnt, Vector3d Ps[], Matrix3d Rs
 
 void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vector3d tic[], Matrix3d ric[])
 {
+    // 遍历所有特征点  FeaturePerId
     for (auto &it_per_id : feature)
     {
+        // 跳过已有深度的点
         if (it_per_id.estimated_depth > 0)
             continue;
 
+        // 双目匹配情况
         if (STEREO && it_per_id.feature_per_frame[0].is_stereo)
         {
+            // 利用对应时刻IMU位姿+ric、tic，求出左右目相机位姿
             int imu_i = it_per_id.start_frame;
             Eigen::Matrix<double, 3, 4> leftPose;
             Eigen::Vector3d t0 = Ps[imu_i] + Rs[imu_i] * tic[0];

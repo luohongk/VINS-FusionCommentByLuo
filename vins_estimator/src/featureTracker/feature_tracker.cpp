@@ -229,6 +229,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             // done 这里的n_pts是用来存储检测到的特征点的数量的。就在这里维护的！
 
             // mark 这里的n_pts为什么是值传递？？？
+            // 该函数使用了Shi-Tomasi角点检测算法
             cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);
         }
         else
@@ -288,6 +289,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             // 复制ID并根据状态缩减左图像和右图像的点
             // mark 这里的这个ids不是左目的吗？ 为什么把左目的ids赋值给右目？？？
             // done 由于是根据左目特征点光流追踪右目的特征点，因此左目右目ID是相同的。都对应的是同一个地图点
+            // 这里主要是获取右目的ids来计算当前右目与上一帧右目的光流速度
             ids_right = ids;
             reduceVector(cur_right_pts, status);
             reduceVector(ids_right, status);
@@ -484,10 +486,12 @@ vector<cv::Point2f> FeatureTracker::ptsVelocity(vector<int> &ids, vector<cv::Poi
     {
         cur_id_pts.insert(make_pair(ids[i], pts[i]));
     }
-
+    
+    // 如果没有前一帧特征点，也就是第一帧，压根就不会进行提取，这个if就进入不了，直接进入else
     // caculate points velocity
     if (!prev_id_pts.empty())
-    {
+    {   
+        // 这里面就是计算光流的速度
         double dt = cur_time - prev_time;
         
         for (unsigned int i = 0; i < pts.size(); i++)
