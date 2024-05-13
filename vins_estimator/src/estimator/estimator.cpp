@@ -26,8 +26,10 @@ Estimator::~Estimator()
     }
 }
 
+// 清理状态量
 void Estimator::clearState()
 {
+    // 一帧处理完毕，把加速度，角速度，特征帧出队
     mProcess.lock();
     while (!accBuf.empty())
         accBuf.pop();
@@ -223,11 +225,13 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
 void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vector3d &angularVelocity)
 {
     mBuf.lock();
+    // 把线加速度，角速度存入缓冲区
     accBuf.push(make_pair(t, linearAcceleration));
     gyrBuf.push(make_pair(t, angularVelocity));
     // printf("input imu with time %f \n", t);
     mBuf.unlock();
 
+    // 如果是非线性问题的求解
     if (solver_flag == NON_LINEAR)
     {
         mPropagate.lock();
@@ -237,9 +241,12 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
     }
 }
 
+// 这个函数把提取出来的特征帧放入特征帧缓冲队列中，如果是从featuretracker这个节点中拿到特征，就直接进行测量线程
+// 但是实际情况不是这样的，这个函数仅限于新增特征提取与匹配节点的时候用
 void Estimator::inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame)
 {
     mBuf.lock();
+    // 这里直接把特征帧数据存入特征帧缓冲队列中
     featureBuf.push(make_pair(t, featureFrame));
     mBuf.unlock();
 
@@ -251,6 +258,8 @@ void Estimator::inputFeature(double t, const map<int, vector<pair<int, Eigen::Ma
 bool Estimator::getIMUInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d>> &accVector,
                                vector<pair<double, Eigen::Vector3d>> &gyrVector)
 {
+    // 先看看imu数据是不是空的，是空的打印一下提示信息，然后返回false。
+    // 空的就代表没有拿到imu数据
     if (accBuf.empty())
     {
         printf("not receive imu\n");
@@ -288,8 +297,11 @@ bool Estimator::getIMUInterval(double t0, double t1, vector<pair<double, Eigen::
     return true;
 }
 
+// 这个函数看看能不能拿imu数据，只有当
 bool Estimator::IMUAvailable(double t)
 {
+    // 只有当accBuf.empty()==false;也就是accBuf不是空的时候，而且传入的时间戳t小于等于accBuf的最后一个时间戳
+    // 其余情况都返回false
     if (!accBuf.empty() && t <= accBuf.back().first)
         return true;
     else
@@ -321,7 +333,7 @@ void Estimator::processMeasurements()
             curTime = feature.first + td;
             while (1)
             {
-                // 如果不使用 IMU 或者 IMU 数据可用，则跳出循环
+                // 如果不使用 IMU 或者 IMU 数据不可用，则跳出循环
                 if ((!USE_IMU || IMUAvailable(feature.first + td)))
                     break;
                 else
@@ -407,26 +419,44 @@ void Estimator::processMeasurements()
 // 初始化第一个IMU姿势
 void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector)
 {
-    printf("init first imu pose\n"); // 打印消息
-    initFirstPoseFlag = true;        // 设置初始化标志为true
-    // return;  // 返回
+    // 打印消息
+    printf("init first imu pose\n");
 
-    Eigen::Vector3d averAcc(0, 0, 0);             // 初始化平均加速度向量
-    int n = (int)accVector.size();                // 获取加速度向量的大小
-    for (size_t i = 0; i < accVector.size(); i++) // 遍历加速度向量
+    // 设置初始化标志为true
+    initFirstPoseFlag = true;
+
+    // 初始化平均加速度向量
+    Eigen::Vector3d averAcc(0, 0, 0);
+
+    // 获取加速度向量的大小
+    int n = (int)accVector.size();
+
+    // 遍历加速度向量
+    for (size_t i = 0; i < accVector.size(); i++)
     {
-        averAcc = averAcc + accVector[i].second; // 计算加速度向量的和
+        // 计算加速度向量的和
+        averAcc = averAcc + accVector[i].second;
     }
-    averAcc = averAcc / n;                                                  // 计算平均加速度
-    printf("averge acc %f %f %f\n", averAcc.x(), averAcc.y(), averAcc.z()); // 打印平均加速度信息
+
+    // 计算平均加速度
+    averAcc = averAcc / n;
+
+    // 打印平均加速度信息
+    printf("averge acc %f %f %f\n", averAcc.x(), averAcc.y(), averAcc.z());
 
     // mark 为什么要用偏航角修正呢？？？
-    Matrix3d R0 = Utility::g2R(averAcc); // 计算对应的旋转矩阵
-    double yaw = Utility::R2ypr(R0).x(); // 获取偏航角
+    // 计算对应的旋转矩阵
+    Matrix3d R0 = Utility::g2R(averAcc);
+
+    // 获取偏航角
+    double yaw = Utility::R2ypr(R0).x();
 
     //  将翻滚角、府仰角设为零，重新求解旋转矩阵（应该是绕Z轴的旋转矩阵）
-    R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0; // 修正旋转矩阵
-    Rs[0] = R0;                                            // 存储旋转矩阵
+    // 修正旋转矩阵
+    R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
+
+    // 存储旋转矩阵
+    Rs[0] = R0;
     cout << "init R0 " << endl
          << Rs[0] << endl; // 打印旋转矩阵信息
     // Vs[0] = Vector3d(5, 0, 0);  // 设置速度状态量
@@ -515,31 +545,45 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
     // 若不为关键帧，则在边缘化的时候marge掉次新帧；
     if (f_manager.addFeatureCheckParallax(frame_count, image, td)) // 调用f_manager的addFeatureCheckParallax方法
     {
-        marginalization_flag = MARGIN_OLD; // 将边缘化标志设置为MARGIN_OLD
+        // 将边缘化标志设置为MARGIN_OLD
+        marginalization_flag = MARGIN_OLD;
         // printf("keyframe\n");
     }
     else
     {
-        marginalization_flag = MARGIN_SECOND_NEW; // 将边缘化标志设置为MARGIN_SECOND_NEW
+        // 将边缘化标志设置为MARGIN_SECOND_NEW
+        marginalization_flag = MARGIN_SECOND_NEW;
         // printf("non-keyframe\n");
     }
 
-    ROS_DEBUG("%s", marginalization_flag ? "Non-keyframe" : "Keyframe"); // 根据边缘化标志记录调试信息
-    ROS_DEBUG("Solving %d", frame_count);                                // 记录调试信息：解算帧数
-    ROS_DEBUG("number of feature: %d", f_manager.getFeatureCount());     // 记录调试信息：特征点数量
+    // 根据边缘化标志记录调试信息
+    ROS_DEBUG("%s", marginalization_flag ? "Non-keyframe" : "Keyframe");
 
-    // 保留时间戳
-    Headers[frame_count] = header; // 将Headers数组的第frame_count个
+    // 记录调试信息：解算帧数
+    ROS_DEBUG("Solving %d", frame_count);
+
+    // 记录调试信息：特征点数量
+    ROS_DEBUG("number of feature: %d", f_manager.getFeatureCount());
+
+    // 保留时间戳，将Headers数组的第frame_count个
+    Headers[frame_count] = header;
 
     /*构造新的一帧，加入all_image_frame*/
-    ImageFrame imageframe(image, header);                  // 创建ImageFrame对象
-    imageframe.pre_integration = tmp_pre_integration;      // 设置imageframe的预积分属性
-    all_image_frame.insert(make_pair(header, imageframe)); // 将imageframe插入到all_image_frame中
+    // 创建ImageFrame对象
+    ImageFrame imageframe(image, header);
+
+    // 设置imageframe的预积分属性
+    imageframe.pre_integration = tmp_pre_integration;
+
+    // 将imageframe插入到all_image_frame中
+    all_image_frame.insert(make_pair(header, imageframe));
 
     // 这里创建了一个临时的预积分对象
-    tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]}; // 创建IntegrationBase对象
+    // 创建IntegrationBase对象
+    tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
 
-    if (ESTIMATE_EXTRINSIC == 2) // 如果ESTIMATE_EXTRINSIC等于2
+    // 如果ESTIMATE_EXTRINSIC等于2
+    if (ESTIMATE_EXTRINSIC == 2)
     {
         // 校准外参参数，需要进行旋转运动
         ROS_INFO("calibrating extrinsic param, rotation movement is needed");
@@ -591,19 +635,32 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
                 // initial_timestamp初始化为0了
                 if (ESTIMATE_EXTRINSIC != 2 && (header - initial_timestamp) > 0.1)
                 {
-                    result = initialStructure(); // 执行初始化
-                    initial_timestamp = header;  // 更新初始时间戳
+                    // 执行初始化
+                    result = initialStructure();
+
+                    // 更新初始时间戳
+                    initial_timestamp = header;
                 }
                 if (result)
                 {
-                    optimization();                     // 执行优化
-                    updateLatestStates();               // 更新最新状态
-                    solver_flag = NON_LINEAR;           // 更新求解器标志为非线性
-                    slideWindow();                      // 滑动窗口
-                    ROS_INFO("Initialization finish!"); // 输出初始化完成信息
+                    // 执行优化
+                    optimization();
+
+                    // 更新最新状态
+                    updateLatestStates();
+
+                    // 更新求解器标志为非线性
+                    solver_flag = NON_LINEAR;
+
+                    // 滑动窗口
+                    slideWindow();
+
+                    // 输出初始化完成信息
+                    ROS_INFO("Initialization finish!");
                 }
                 else
-                    slideWindow(); // 滑动窗口
+                    // 滑动窗口
+                    slideWindow();
             }
         }
 
@@ -619,14 +676,18 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
             // 滑动窗口满了
             if (frame_count == WINDOW_SIZE)
             {
-                map<double, ImageFrame>::iterator frame_it; // 使用迭代器遍历所有图像帧
+                // 使用迭代器遍历所有图像帧
+                map<double, ImageFrame>::iterator frame_it;
                 int i = 0;
 
                 // 给滑窗内的帧设置R、t（IMU系到世界系）
                 for (frame_it = all_image_frame.begin(); frame_it != all_image_frame.end(); frame_it++)
                 {
-                    frame_it->second.R = Rs[i]; // 更新图像帧旋转矩阵
-                    frame_it->second.T = Ps[i]; // 更新图像帧平移向量
+                    // 更新图像帧旋转矩阵
+                    frame_it->second.R = Rs[i];
+
+                    // 更新图像帧平移向量
+                    frame_it->second.T = Ps[i];
                     i++;
                 }
 
@@ -659,17 +720,31 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
         // 双目初始化
         if (STEREO && !USE_IMU)
         {
-            f_manager.initFramePoseByPnP(frame_count, Ps, Rs, tic, ric); // 通过PnP初始化帧姿态
-            f_manager.triangulate(frame_count, Ps, Rs, tic, ric);        // 三角化
-            optimization();                                              // 执行优化
+            // 通过PnP初始化帧姿态
+            f_manager.initFramePoseByPnP(frame_count, Ps, Rs, tic, ric);
+
+            // 三角化
+            f_manager.triangulate(frame_count, Ps, Rs, tic, ric);
+
+            // 执行优化
+            optimization();
 
             if (frame_count == WINDOW_SIZE)
             {
-                optimization();                     // 执行优化
-                updateLatestStates();               // 更新最新状态
-                solver_flag = NON_LINEAR;           // 更新求解器标志为非线性
-                slideWindow();                      // 滑动窗口
-                ROS_INFO("Initialization finish!"); // 输出初始化完成信息
+                // 执行优化
+                optimization();
+
+                // 更新最新状态
+                updateLatestStates();
+
+                // 更新求解器标志为非线性
+                solver_flag = NON_LINEAR;
+
+                // 滑动窗口
+                slideWindow();
+
+                // 输出初始化完成信息
+                ROS_INFO("Initialization finish!");
             }
         }
 
@@ -1099,6 +1174,9 @@ bool Estimator::relativePose(Matrix3d &relative_R, Vector3d &relative_T, int &l)
     return false; // 未找到符合条件的帧，返回 false
 }
 
+// 在执行优化的时候vector2double()函数将优化变量转化为double数组
+// 这个是双精度浮点数，放便优化
+// 双精度浮点数这样精度比较高？
 void Estimator::vector2double()
 {
     for (int i = 0; i <= WINDOW_SIZE; i++)
@@ -1287,9 +1365,9 @@ bool Estimator::failureDetection()
     return false;
 }
 
-
 // 状态向量共包括滑动窗口内的 n+1 个所有相机的状态（包括位置、旋转、速度、加速度计 bias 和陀螺仪 bias）
 // 、Camera 到 IMU 的外参、m+1 个 3D 点的逆深度：
+// 这个函数可太重要了，也是后端优化的核心部分，大概包括了300多行代码
 void Estimator::optimization()
 {
     TicToc t_whole, t_prepare;
@@ -1851,8 +1929,11 @@ void Estimator::outliersRejection(set<int> &removeIndex)
     }
 }
 
+// 这段代码的功能是根据传感器数据和之前的状态，通过一系列的运算和更新，进行姿态预测和状态估计，包括更新姿态、位置和速度等变量。
+// 传入了线加速度，角速度以及当前的时间戳
 void Estimator::fastPredictIMU(double t, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity)
 {
+    // latest_time为上一次状态更新的时间，这里计算时间差
     double dt = t - latest_time;
     latest_time = t;
     Eigen::Vector3d un_acc_0 = latest_Q * (latest_acc_0 - latest_Ba) - g;
