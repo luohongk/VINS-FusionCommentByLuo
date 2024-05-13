@@ -6,7 +6,7 @@ project(vins)
 # 设置构建类型为 Release
 set(CMAKE_BUILD_TYPE "Release")
 # 设置 C++ 编译标准为 c++11
-set(CMAKE_CXX_FLAGS "-std=c++11")
+set(CMAKE_CXX_FLAGS "-std=c++14")
 # 设置 Release 模式下的编译标志
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 

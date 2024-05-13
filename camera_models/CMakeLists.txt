@@ -6,7 +6,7 @@ project(camera_models)
 # 设置构建类型为Release
 set(CMAKE_BUILD_TYPE "Release")
 # 设置C++编译器标准为C++11
-set(CMAKE_CXX_FLAGS "-std=c++11")
+set(CMAKE_CXX_FLAGS "-std=c++14")
 # Release模式下的编译选项，包含优化等级和位置无关代码标志
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -fPIC")
 
