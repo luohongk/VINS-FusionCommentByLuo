@@ -8,6 +8,7 @@
 
 ### 项目结构
 
+```
 ├── learnnote
 │   ├── image
 │   ├── processMeasurements测量线程分析.md
@@ -35,6 +36,7 @@
 │   ├── package.xml
 │   └── src
 └── 问题.md
+```
 
 在相机模型，配置文件，全局融合模块基本没有动。learnnote主要是一些笔记，note是思维导图，vins_estimator节点中做了大量的注释可以进入看看，这也是VINS-Fusion的核心部分
 
