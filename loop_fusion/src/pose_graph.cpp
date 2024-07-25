@@ -156,7 +156,6 @@ void PoseGraph::addKeyFrame(KeyFrame *cur_kf, bool flag_detect_loop)
                 shift_r = w_R_cur * vio_R_cur.transpose();
             shift_t = w_P_cur - w_R_cur * vio_R_cur.transpose() * vio_P_cur;
 
-
             // 将位姿转化为世界坐标系
             // shift vio pose of whole sequence to the world frame
             if (old_kf->sequence != cur_kf->sequence && sequence_loop[cur_kf->sequence] == 0)
@@ -212,8 +211,8 @@ void PoseGraph::addKeyFrame(KeyFrame *cur_kf, bool flag_detect_loop)
         ofstream loop_path_file(VINS_RESULT_PATH, ios::app);
         loop_path_file.setf(ios::fixed, ios::floatfield);
         loop_path_file.precision(9);
-        loop_path_file << cur_kf->time_stamp<< " ";
-        loop_path_file.precision(9);
+        // loop_path_file.precision(0);
+        loop_path_file << cur_kf->time_stamp << " ";
         loop_path_file << P.x() << " "
                        << P.y() << " "
                        << P.z() << " "
@@ -886,15 +885,16 @@ void PoseGraph::updatePath()
             ofstream loop_path_file(VINS_RESULT_PATH, ios::app);
             loop_path_file.setf(ios::fixed, ios::floatfield);
             loop_path_file.precision(9);
-            loop_path_file << (*it)->time_stamp<< " ";
-            loop_path_file.precision(9);
+            loop_path_file << (*it)->time_stamp << " ";
+            // loop_path_file.precision(5);
             loop_path_file << P.x() << " "
                            << P.y() << " "
                            << P.z() << " "
-                           << Q.w() << " "
                            << Q.x() << " "
                            << Q.y() << " "
-                           << Q.z() << endl;
+                           << Q.z() << " "
+                           << Q.w()
+                           << endl;
             loop_path_file.close();
         }
         // draw local connection

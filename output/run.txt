@@ -1,9 +1,6 @@
-evo_ape tum -r full truth/V201.csv mono+imu+sp+lg+briefloop/V201_vio.csv --align
-evo_rpe tum truth/V201.csv mono+imu+sp+lg+briefloop/V201_vio.csv --pose_relation rot_part
-evo_rpe tum truth/V201.csv mono+imu+sp+lg+briefloop/V201_vio.csv --pose_relation trans_part
-evo_ape tum -r full truth/V201.csv mono+imu+sp+lg+briefloop/V201_vio_loop.csv --align
-evo_rpe tum truth/V201.csv mono+imu+sp+lg+briefloop/V201_vio_loop.csv --pose_relation rot_part
-evo_rpe tum truth/V201.csv mono+imu+sp+lg+briefloop/V201_vio_loop.csv --pose_relation trans_part
+evo_ape tum -r full truth/V201.csv V201_vio.csv --align
+evo_rpe tum truth/V201.csv V201_vio.csv --pose_relation rot_part
+evo_rpe tum truth/V201.csv V201_vio.csv --pose_relation trans_part
 evo_ape tum -r full truth/V201.csv V201_vio_loop.csv --align
 evo_rpe tum truth/V201.csv V201_vio_loop.csv --pose_relation rot_part
 evo_rpe tum truth/V201.csv V201_vio_loop.csv --pose_relation trans_part
