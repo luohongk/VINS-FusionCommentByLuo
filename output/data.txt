@@ -1,0 +1,11 @@
+rosbag play ~/data/EuRoC/MH_01_easy.bag
+rosbag play ~/data/EuRoC/MH_02_easy.bag
+rosbag play ~/data/EuRoC/MH_03_medium.bag
+rosbag play ~/data/EuRoC/MH_04_difficult.bag
+rosbag play ~/data/EuRoC/MH_05_difficult.bag
+rosbag play ~/data/EuRoC/V1_01_easy.bag
+rosbag play ~/data/EuRoC/V1_02_medium.bag
+rosbag play ~/data/EuRoC/V1_03_difficult.bag
+rosbag play ~/data/EuRoC/V2_01_easy.bag
+rosbag play ~/data/EuRoC/V2_02_medium.bag
+rosbag play ~/data/EuRoC/V2_03_difficult.bag
