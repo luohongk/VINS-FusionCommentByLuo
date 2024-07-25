@@ -1,70 +1,70 @@
 APE w.r.t. full transformation (unit-less)
 (with SE(3) Umeyama alignment)
 
-max	0.128692
-mean	0.068207
-median	0.059319
-min	0.032917
-rmse	0.072758
-sse	0.682890
-std	0.025327
+max	0.421679
+mean	0.164859
+median	0.137108
+min	0.022899
+rmse	0.189023
+sse	64.992433
+std	0.092473
 
 RPE w.r.t. rotation part (unit-less)
 for delta = 1 (frames) using consecutive pairs
 (not aligned)
 
-max	0.050386
-mean	0.004209
-median	0.001659
-min	0.000077
-rmse	0.008253
-sse	0.008718
-std	0.007099
+max	0.039236
+mean	0.000719
+median	0.000381
+min	0.000028
+rmse	0.002183
+sse	0.008666
+std	0.002062
 
 RPE w.r.t. translation part (m)
 for delta = 1 (frames) using consecutive pairs
 (not aligned)
 
-max	0.009649
-mean	0.001671
-median	0.001279
-min	0.000161
-rmse	0.002161
-sse	0.000598
-std	0.001369
+max	0.015715
+mean	0.002385
+median	0.002062
+min	0.000012
+rmse	0.003038
+sse	0.016778
+std	0.001882
 
 APE w.r.t. full transformation (unit-less)
 (with SE(3) Umeyama alignment)
 
-max	0.087216
-mean	0.047781
-median	0.040129
-min	0.032637
-rmse	0.050465
-sse	0.267405
-std	0.016237
+max	0.224998
+mean	0.083855
+median	0.081448
+min	0.013670
+rmse	0.091079
+sse	9.025445
+std	0.035549
 
 RPE w.r.t. rotation part (unit-less)
 for delta = 1 (frames) using consecutive pairs
 (not aligned)
 
-max	0.016044
-mean	0.002798
-median	0.001596
-min	0.000108
-rmse	0.003957
-sse	0.001628
-std	0.002798
+max	0.014311
+mean	0.000885
+median	0.000570
+min	0.000032
+rmse	0.001536
+sse	0.002565
+std	0.001255
 
 RPE w.r.t. translation part (m)
 for delta = 1 (frames) using consecutive pairs
 (not aligned)
 
-max	0.011912
-mean	0.002066
-median	0.001479
-min	0.000304
-rmse	0.002828
-sse	0.000832
-std	0.001932
+max	0.030600
+mean	0.005068
+median	0.003677
+min	0.000149
+rmse	0.006640
+sse	0.047925
+std	0.004290
 
