@@ -1,6 +1,4 @@
-evo_ape tum -r full truth/V201.csv V201_vio.csv --align
-evo_rpe tum truth/V201.csv V201_vio.csv --pose_relation rot_part
-evo_rpe tum truth/V201.csv V201_vio.csv --pose_relation trans_part
-evo_ape tum -r full truth/V201.csv V201_vio_loop.csv --align
-evo_rpe tum truth/V201.csv V201_vio_loop.csv --pose_relation rot_part
-evo_rpe tum truth/V201.csv V201_vio_loop.csv --pose_relation trans_part
+roslaunch vins vins_rviz.launch
+rosrun vins vins_node ~/catkin_ws/src/VINS-FusionCommentByLuo/config/euroc/euroc_mono_imu_config.yaml 
+rosrun loop_fusion loop_fusion_node ~/catkin_ws/src/VINS-FusionCommentByLuo/config/euroc/euroc_mono_imu_config.yaml 
+rosbag play ~/data/EuRoC/MH_01_easy.bag
