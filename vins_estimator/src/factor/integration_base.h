@@ -38,9 +38,12 @@ class IntegrationBase
 
     void push_back(double dt, const Eigen::Vector3d &acc, const Eigen::Vector3d &gyr)
     {
+        // 把变量存入预积分类中
         dt_buf.push_back(dt);
         acc_buf.push_back(acc);
         gyr_buf.push_back(gyr);
+
+        // 预积分
         propagate(dt, acc, gyr);
     }
 
@@ -60,6 +63,15 @@ class IntegrationBase
             propagate(dt_buf[i], acc_buf[i], gyr_buf[i]);
     }
 
+    // 参数解释
+    //     _dt：时间间隔，单位为秒。
+    // _acc_0、_gyr_0：加速度和角速度的初始值，分别是一个三维向量。
+    // _acc_1、_gyr_1：加速度和角速度的终值，分别是一个三维向量。
+    // delta_p、delta_q、delta_v：物体的位置、姿态和速度的增量，分别是一个三维向量和四元数。
+    // linearized_ba、linearized_bg：线性化加速度和角速度的偏置，分别是一个三维向量和三维向量。
+    // result_delta_p、result_delta_q、result_delta_v：计算得到的位置、姿态和速度的增量，分别是一个三维向量和四元数。
+    // result_linearized_ba、result_linearized_bg：计算得到的线性化加速度和角速度的偏置，分别是一个三维向量和三维向量。
+    // update_jacobian：一个布尔值，表示是否更新雅可比矩阵。
     void midPointIntegration(double _dt, 
                             const Eigen::Vector3d &_acc_0, const Eigen::Vector3d &_gyr_0,
                             const Eigen::Vector3d &_acc_1, const Eigen::Vector3d &_gyr_1,
@@ -69,16 +81,27 @@ class IntegrationBase
                             Eigen::Vector3d &result_linearized_ba, Eigen::Vector3d &result_linearized_bg, bool update_jacobian)
     {
         //ROS_INFO("midpoint integration");
+        // 把加速度向量转换到另外一个坐标系下
+        // 将初始加速度减去加速度偏差，然后通过四元数旋转到全局坐标系。
         Vector3d un_acc_0 = delta_q * (_acc_0 - linearized_ba);
+        // 计算平均角速度，并减去陀螺仪偏差。
         Vector3d un_gyr = 0.5 * (_gyr_0 + _gyr_1) - linearized_bg;
+        // 更新姿态四元数。使用角速度和时间间隔创建增量旋转，然后与当前姿态相乘。
         result_delta_q = delta_q * Quaterniond(1, un_gyr(0) * _dt / 2, un_gyr(1) * _dt / 2, un_gyr(2) * _dt / 2);
+        // 类似，但使用更新后的姿态和第二个时刻的加速度。
         Vector3d un_acc_1 = result_delta_q * (_acc_1 - linearized_ba);
+        // 计算两个时刻加速度的平均值。
         Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
+        // 更新位置。使用当前速度和平均加速度，应用运动学公式。
         result_delta_p = delta_p + delta_v * _dt + 0.5 * un_acc * _dt * _dt;
+        // 更新速度。使用平均加速度和时间间隔。
         result_delta_v = delta_v + un_acc * _dt;
+        // 保持加速度偏差不变。
         result_linearized_ba = linearized_ba;
+        // 保持陀螺仪偏差不变。
         result_linearized_bg = linearized_bg;         
 
+        // 是否更新雅可比
         if(update_jacobian)
         {
             Vector3d w_x = 0.5 * (_gyr_0 + _gyr_1) - linearized_bg;
@@ -136,6 +159,8 @@ class IntegrationBase
 
     }
 
+// 该函数用于在给定时间步长和传感器数据下传播状态。它通过中点积分方法计算位置、姿态和速度的增量，并更新状态变量。最后，函数还会归一化四元数，并更新加速度和陀螺仪的初始值，以便在下一次调用时使用。
+
     void propagate(double _dt, const Eigen::Vector3d &_acc_1, const Eigen::Vector3d &_gyr_1)
     {
         dt = _dt;
@@ -146,7 +171,9 @@ class IntegrationBase
         Vector3d result_delta_v;
         Vector3d result_linearized_ba;
         Vector3d result_linearized_bg;
-
+        
+        // 中值积分
+        // 这个函数可能是用于计算IMU数据在给定时间间隔内的变化。
         midPointIntegration(_dt, acc_0, gyr_0, _acc_1, _gyr_1, delta_p, delta_q, delta_v,
                             linearized_ba, linearized_bg,
                             result_delta_p, result_delta_q, result_delta_v,
@@ -154,6 +181,9 @@ class IntegrationBase
 
         //checkJacobian(_dt, acc_0, gyr_0, acc_1, gyr_1, delta_p, delta_q, delta_v,
         //                    linearized_ba, linearized_bg);
+
+        // 将计算结果赋值给成员变量delta_p、delta_q、delta_v、linearized_ba和linearized_bg，
+        // 并将dt累加到sum_dt中。同时，更新acc_0和gyr_0的值。
         delta_p = result_delta_p;
         delta_q = result_delta_q;
         delta_v = result_delta_v;

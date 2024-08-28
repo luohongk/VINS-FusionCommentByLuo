@@ -448,7 +448,7 @@ void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVecto
     // 计算对应的旋转矩阵
     Matrix3d R0 = Utility::g2R(averAcc);
 
-    // 获取偏航角
+    // 获取偏航角，偏航角不会受到重力影响
     double yaw = Utility::R2ypr(R0).x();
 
     //  将翻滚角、府仰角设为零，重新求解旋转矩阵（应该是绕Z轴的旋转矩阵）
@@ -481,9 +481,10 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
         gyr_0 = angular_velocity;
     }
 
-    // 检查当前帧是不是已经有预积分的一些变量
+    // 看看pre_integrations是不是空指针，如果是空指针，意味着当前帧没有预积分的一些变量
     if (!pre_integrations[frame_count])
     {
+        // 新建预积分的变量
         pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
     }
     // 如果当前帧不是第一帧，就计算下面的，把预积分的一些数据保存好存到pre_integrations中
@@ -491,10 +492,11 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
     {
         // 注意：这里的push_back被重写了，调用的是预积分对象中的push_back方法，
         // 在里面保存IMU消息，中值积分递推、更新雅可比矩阵、协方差矩阵
+        // frame_count是指窗内的第几帧图像
         pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity);
         // if(solver_flag != NON_LINEAR)
 
-        // 临时预积分对象：中值积分递推、更新雅可比矩阵、协方差矩阵
+        // 临时预积分对象
         tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity);
 
         // 保存时间戳列表

@@ -83,35 +83,56 @@ void sync_process()
 {
     while (1)
     {
-        if (STEREO) // 如果使用双目相机
+        // 如果使用双目相机
+        if (STEREO)
         {
-            cv::Mat image0, image1;  // 用于存储图像数据
-            std_msgs::Header header; // 存储图像消息的头信息
-            double time = 0;         // 存储时间戳
-            m_buf.lock();            // 加锁以访问图像缓冲区
+            // 用于存储图像数据
+            cv::Mat image0, image1;
+            // 存储图像消息的头信息
+            std_msgs::Header header;
+            // 存储时间戳
+            double time = 0;
+            // 加锁以访问图像缓冲区
+            m_buf.lock();
+            // 这部分进行数据对齐，将双目相机的图像对齐到同一时间戳
             if (!img0_buf.empty() && !img1_buf.empty())
             {
-                double time0 = img0_buf.front()->header.stamp.toSec(); // 获取图像1的时间戳
-                double time1 = img1_buf.front()->header.stamp.toSec(); // 获取图像2的时间戳
+                // 获取图像1的时间戳
+                double time0 = img0_buf.front()->header.stamp.toSec();
+                // 获取图像2的时间戳
+                double time1 = img1_buf.front()->header.stamp.toSec();
                 // 0.003秒的时间容差
-                if (time0 < time1 - 0.003) // 如果图像1比图像2早超过了0.003秒
+                // 如果图像1比图像2早超过了0.003秒
+                if (time0 < time1 - 0.003)
                 {
-                    img0_buf.pop();         // 丢弃图像1
-                    printf("throw img0\n"); // 打印丢弃图像1的消息
+                    // 丢弃图像1
+                    img0_buf.pop();
+                    // 打印丢弃图像1的消息
+                    printf("throw img0\n");
                 }
-                else if (time0 > time1 + 0.003) // 如果图像1比图像2晚超过了0.003秒
+                // 如果图像1比图像2晚超过了0.003秒
+                else if (time0 > time1 + 0.003) 
                 {
-                    img1_buf.pop();         // 丢弃图像2
-                    printf("throw img1\n"); // 打印丢弃图像2的消息
+                    // 丢弃图像2
+                    img1_buf.pop();
+                    // 打印丢弃图像2的消息
+                    printf("throw img1\n");
                 }
-                else // 如果图像1和图像2的时间戳在容差范围内
+                // 如果图像1和图像2的时间戳在容差范围内
+                else
                 {
-                    time = img0_buf.front()->header.stamp.toSec(); // 使用图像1的时间戳
-                    header = img0_buf.front()->header;             // 获取图像1的头信息
-                    image0 = getImageFromMsg(img0_buf.front());    // 获取图像1的数据
-                    img0_buf.pop();                                // 弹出图像1
-                    image1 = getImageFromMsg(img1_buf.front());    // 获取图像2的数据
-                    img1_buf.pop();                                // 弹出图像2
+                    // 使用图像1的时间戳
+                    time = img0_buf.front()->header.stamp.toSec();
+                    // 获取图像1的头信息
+                    header = img0_buf.front()->header;
+                    // 获取图像1的数据
+                    image0 = getImageFromMsg(img0_buf.front());
+                    // 弹出图像1 
+                    img0_buf.pop();
+                    // 获取图像2的数据
+                    image1 = getImageFromMsg(img1_buf.front());
+                    // 弹出图像2
+                    img1_buf.pop();
                     // printf("find img0 and img1\n");
                 }
             }
@@ -119,12 +140,16 @@ void sync_process()
             if (!image0.empty())                            // 如果图像1不为空
                 estimator.inputImage(time, image0, image1); // 将图像数据传递给评估器进行处理
         }
-        else // 如果未使用双目相机
+
+        // 如果使用的是单目相机
+        else
         {
             cv::Mat image;           // 用于存储图像数据
             std_msgs::Header header; // 存储图像消息的头信息
             double time = 0;         // 存储时间戳
             m_buf.lock();            // 加锁以访问图像缓冲区
+
+            // 单目相机直接获取时间戳和图像数据，header数据
             if (!img0_buf.empty())
             {
                 time = img0_buf.front()->header.stamp.toSec(); // 获取图像的时间戳
@@ -132,8 +157,10 @@ void sync_process()
                 image = getImageFromMsg(img0_buf.front());     // 获取图像的数据
                 img0_buf.pop();                                // 弹出图像
             }
-            m_buf.unlock();                        // 解锁图像缓冲区
-            if (!image.empty())                    // 如果图像不为空
+            m_buf.unlock();                     // 解锁图像缓冲区
+
+            // inputImage为重要函数
+            if (!image.empty())
                 estimator.inputImage(time, image); // 将图像数据传递给评估器进行处理
         }
 
